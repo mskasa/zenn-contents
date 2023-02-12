@@ -100,3 +100,11 @@ https://docs.aws.amazon.com/ja_jp/AmazonS3/latest/userguide/upload-objects.html
 
 有効にすることで、全世界のエッジロケーション経由でデータ転送ができる。
 S3バケットを利用するアプリケーション側では、Transfer Acceleration専用のエンドポイントを指定する。
+
+## 暗号化
+すべてのバケットに対して、基本レベルの暗号化として、Amazon S3 マネージドキーによるサーバー側の暗号化 (SSE-S3) が適用される。
+SSE-S3暗号化では、各S3オブジェクトが、強力な多要素暗号化を使用する一意のデータキーで暗号化される。
+:::message
+SSE-S3暗号化では、オブジェクトデータのみが暗号化される（オブジェクトのメタデータは対象外）
+:::
+https://docs.aws.amazon.com/ja_jp/AmazonS3/latest/userguide/UsingServerSideEncryption.html
