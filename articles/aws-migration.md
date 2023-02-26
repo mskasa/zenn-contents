@@ -2,7 +2,7 @@
 title: "AWS 移行戦略 7R について簡単にまとめてみた"
 emoji: "🦈"
 type: "tech" # tech: 技術記事 / idea: アイデア
-topics: [aws]
+topics: [aws, 移行, サーバー移行, データ移行]
 published: false
 ---
 
