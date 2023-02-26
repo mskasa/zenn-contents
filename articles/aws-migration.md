@@ -8,6 +8,7 @@ published: false
 
 ## 概要
 AWS における移行戦略 7R を簡単にまとめてみました。
+ざっくりと理解することを目的としているので、内容は浅いです。ご容赦ください。
 
 ## 移行戦略
 ### 概要
@@ -63,12 +64,17 @@ https://dev.classmethod.jp/articles/try-migrationreadinessassessment/
 
 ### AWS Application Discovery Service
 [AWS Application Discovery Service](https://aws.amazon.com/jp/application-discovery/) はオンプレミスの情報を収集して、移行計画をサポートするサービスです。
-収集した情報は [AWS Migration Hub](https://aws.amazon.com/jp/migration-hub/) で確認でき、そのまま移行管理にも利用できます。また、収集した情報を Kinesis Data Firehose 経由で S3 に送信し、Athena で SQLクエリを利用した分析が可能です。
+収集した情報は後述する AWS Migration Hub で確認でき、そのまま移行管理にも利用できます。また、収集した情報を Kinesis Data Firehose 経由で S3 に送信し、Athena で SQLクエリを利用した分析が可能です。
 
 ![](/images/aws-migration/discovery.png)
 *[Qiita-【初心者】AWS Application Discovery Service を使ってみる](https://qiita.com/mksamba/items/cb4797763eba25e53ec7)*
 
 https://qiita.com/mksamba/items/cb4797763eba25e53ec7
+
+### AWS Migration Hub
+[AWS Migration Hub](https://aws.amazon.com/jp/migration-hub/) は移行を管理するサービスです。前述の AWS Application Discovery Service で収集した情報を可視化し、最適な移行サービス（3rd Party製含む）を選択することができます。移行開始後は、移行の進捗状況をトラッキングすることができます。詳しくは下記の記事を参照ください。古い記事ですが、イメージを掴む分には問題ないです。
+
+https://dev.classmethod.jp/articles/20170815-migration-hub/
 
 ## 参考
 * [AWS への移行:ベストプラクティスと戦略](https://pages.awscloud.com/rs/112-TZM-766/images/Migrating-to-AWS_Best-Practices-and-Strategies_eBook.pdf)
