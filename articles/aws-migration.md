@@ -13,27 +13,29 @@ AWS における移行戦略 7R を簡単にまとめてみました。
 ### 概要
 | 移行戦略   | 戦略の概要（オンプレのシステムをどうするか）               | 難易度 | 
 | ---------- | ---------------------------------------------------------- | ------ | 
-| Rehost     | IaaS（EC2）中心の構成に移行する                            | 易     | 
-| Relocate   | [VMware Cloud on AWS](https://aws.amazon.com/jp/vmware/) に移行する   | 易     | 
-| Replatform | マネージドサービスを中心とした構成に移行する | 中     | 
-| Repurchase | 同じ価値を提供できる製品（SaaSなど）を購入し、乗り換える   | 中     | 
-| Refactor   | すべての設計を見直し、クラウドネイティブな構成に作り直す | 難     | 
-| Retire     | 廃止する                                                   | -      | 
-| Retain     | 現手を加えずに稼働させ続ける                                    | -      | 
+| Rehost     | IaaS（EC2）中心の構成に移行する。                            | 易     | 
+| Relocate   | [VMware Cloud on AWS](https://aws.amazon.com/jp/vmware/) に移行する。   | 易     | 
+| Replatform | マネージドサービスを中心とした構成に移行する。 | 中     | 
+| Repurchase | 同じ価値を提供できる製品（SaaSなど）を購入し、乗り換える。   | 中     | 
+| Refactor   | すべての設計を見直し、クラウドネイティブな構成に作り直す。 | 難     | 
+| Retire     | 廃止する。                                                   | -      | 
+| Retain     | 現状維持。現手を加えずに稼働させ続ける。                                    | -      | 
 
 ### 検討フロー
 ![](/images/aws-migration/flow.drawio.png)
 :::message
 あくまで「検討の余地あり」なので、矢印の先一択ではないです
 :::
-### Rehost（リホスト）
+
+### 具体例
+#### Rehost（リホスト）
 ![](/images/aws-migration/rehost.drawio.png)
 
 移行ツールとして、[AWS Application Migration Service(AWS MGN)](https://aws.amazon.com/jp/application-migration-service/) があります。
-アンマネージドサービスである EC2 を中心とした構成に乗り換えるため、オンプレミスとの構成や知識のギャップは少なくなります。
+アンマネージドサービスである EC2 を中心とした構成に乗り換えるため、オンプレミスの構成とギャップが小さいというメリットがあります。
 ただし、アプリケーション自体がステートフルなままだと、EC2 をスケーリングできないなどの制約があり、クラウドを利用する旨味が薄くなります。
 
-### Replatform（リプラットフォーム）
+#### Replatform（リプラットフォーム）
 ![](/images/aws-migration/replatform.drawio.png)
 
 DBサーバーは、[AWS Database Migration Service](https://aws.amazon.com/jp/dms/) を利用して、マネージドサービスである RDS や Aurora に移行します。異なる DBエンジンの場合は [AWS Schema Conversion Tool](https://docs.aws.amazon.com/ja_jp/SchemaConversionTool/latest/userguide/CHAP_Welcome.html) で変換します。
@@ -43,7 +45,7 @@ DBサーバーは、[AWS Database Migration Service](https://aws.amazon.com/jp/d
 
 また、[Elastic Beanstalk](https://aws.amazon.com/jp/elasticbeanstalk/) などの PaaS にアプリケーションを移行する場合も、Replatform戦略といえるでしょう。
 
-### Refactor（リファクタリング）
+#### Refactor（リファクタリング）
 コンテナ化が良い例ではないでしょうか。
 
 ![](/images/aws-migration/refactor.png)
