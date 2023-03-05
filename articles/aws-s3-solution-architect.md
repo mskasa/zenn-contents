@@ -3,7 +3,8 @@ title: "AWS SAP-C02 対策 S3編"
 emoji: "🦈"
 type: "tech" # tech: 技術記事 / idea: アイデア
 topics: [aws, s3]
-published: false
+published: true
+published_at: 2023-03-06 07:00
 ---
 
 ## 概要
