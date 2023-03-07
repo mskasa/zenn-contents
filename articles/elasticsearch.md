@@ -66,6 +66,28 @@ https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-types.ht
 | レプリカシャード | シャードの複製   | 
 
 ### ノード
+
+Elasticsearchには、下記のノードのロールがあり、デフォルトではすべて ON になっています。
+
+* master
+* data
+* data_content
+* data_hot
+* data_warm
+* data_cold
+* data_frozen
+* ingest
+* ml
+* remote_cluster_client
+* transform
+
+https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.html#node-roles
+
+#### Coordinating only node
+```yml:elasticsearch.yml
+node.roles: [ ]
+```
+
 |  ノードの種別      | 役割の概要                 | 
 | -------- | --------------------------- | 
 | Master(Master-eligible)    | ・Masterノード<br>・Master候補ノード | 
