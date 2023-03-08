@@ -1,8 +1,8 @@
 ---
-title: "Elasticsearch"
+title: "Elasticsearchの基本概念とユースケースをまとめる"
 emoji: "📚"
 type: "tech" # tech: 技術記事 / idea: アイデア
-topics: [elasticsearch]
+topics: [elasticsearch, kibana, fluentd, kubernetes]
 published: false
 ---
 
