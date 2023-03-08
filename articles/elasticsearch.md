@@ -19,10 +19,10 @@ published: false
 
 ### インデックス
 * ドキュメントを保存する場所のこと
-* 検索を効率的に行うために転置インデックス[^1]を構成したり、さまざまなデータ形式で保存されています
+* 検索を効率的に行うために転置インデックスを構成したり、さまざまなデータ形式で保存されています
 * 後述するシャードという単位に分割されて格納されます
 
-[^1]: [転置インデックス](https://gihyo.jp/dev/serial/01/search-engine/0003)
+https://gihyo.jp/dev/serial/01/search-engine/0003
 
 ### ドキュメント
 * ドキュメントはJSONオブジェクトです
@@ -83,6 +83,17 @@ Elasticsearchには、下記のノードのロールがあり、デフォルト�
 
 https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.html#node-roles
 
+#### 
+```yml:elasticsearch.yml
+node.roles: [ master ]
+```
+
+#### 
+```yml:elasticsearch.yml
+node.roles: [ data ]
+```
+
+
 #### Coordinating only node
 ```yml:elasticsearch.yml
 node.roles: [ ]
@@ -116,7 +127,38 @@ node.roles: [ ]
 ## Masterノードの選定
 
 ## シャード分割とレプリカ
+p.65
 
 
 Document Typeは廃止
 https://www.uipath.com/ja/community-blog/knowledge-base/elasticsearch-index-template
+
+## ユースケース
+実際に私がプロジェクトで構築したシステムを参考にユースケースを見ていきましょう。
+
+![](/images/elasticsearch/elasticsearch-usecase.drawio.png)
+
+### Relational Database の wrapper
+
+上図の Web/APIサーバー群 → 全文検索サーバー群 についてです。
+
+通常、RDB はテーブル設計段階で正規化されているはずです。正規化はデータを整合的に管理する上で必要ですが、同時に検索のパフォーマンスを悪化させます。`join`されまくっているクエリが遅いのは皆さん経験したことあるでしょう。
+
+例えば、顧客検索を実装したいとき、参照するテーブルが多く、データ量も多いとなった場合、Elasticsearchを検討すべきです。データ管理のための顧客に関連する RDB のテーブル群とは別に、検索に特化した、顧客に関連する情報をすべて保持した Elasticsearch の顧客インデックスを作ります。
+
+要するに RDB の検索面での wrapper のような働きをしてくれるわけです。
+
+### ログ収集と可視化
+
+上図の Web/APIサーバー群 → ログ収集サーバー についてです。
+
+Kubernetes環境で分散システムを構築した場合のログ収集として、サイドカーのfluentdでログをtail（取り込み）し、ログ収集サーバーにforwardします。
+ログ収集サーバー側のfluentd(td-agent)で受け取ったログをElaticsearchに格納し、Kibanaを通してGUIでログを解析できます。
+Elasticsearchの機能であるIndex Lifecycle Management(ILM)を利用して、日付単位でログのインデックスを作成、30日経過したインデックスを削除などを実現できます。
+
+ポイントは、分散したシステムのログを収集することで、ログの横断検索ができるということです。逆に、その必要がないのであれば、過剰な構成といえるでしょう。
+
+:::message
+スタンダードな全文検索システムとしての事例はこちら↓
+https://www.elastic.co/jp/customers/nikkei-1
+:::
