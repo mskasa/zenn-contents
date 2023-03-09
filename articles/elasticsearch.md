@@ -6,8 +6,13 @@ topics: [elasticsearch, kibana, fluentd, kubernetes]
 published: false
 ---
 
+## 本記事の目的
 
-## 論理的な概念
+## Elasticsearchの概要
+
+## Elasticsearchの論理的な概念
+
+まずは Elasticsearchの論理的な概念（見かけ上の
 
 ![](/images/elasticsearch/elasticsearch-0.drawio.png)
 
@@ -20,7 +25,6 @@ published: false
 ### インデックス
 * ドキュメントを保存する場所のこと
 * 検索を効率的に行うために転置インデックスを構成したり、さまざまなデータ形式で保存されています
-* 後述するシャードという単位に分割されて格納されます
 
 https://gihyo.jp/dev/serial/01/search-engine/0003
 
@@ -38,23 +42,22 @@ https://gihyo.jp/dev/serial/01/search-engine/0003
 
 ### フィールド
 * ドキュメント内の`key=value`の組をフィールドと呼びます
-* Elasticsearchにおける転置インデックスは、フィールドごとに作成、管理されています
 * さまざまなデータ型がサポートされており、マッピングを定義することで型を指定します
+    * マッピング
+        * インデックスの設定項目の1つ
+        * ドキュメント内の各フィールドのデータ構造や型を記述した情報のこと
+        * Elasticsearchが推測して自動的にマッピングを定義してくれるため、事前定義は必ずしも必要ではありません
 
 https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
 
-#### マッピング
-* インデックスの設定項目の1つ
-* ドキュメント内の各フィールドのデータ構造や型を記述した情報のこと
-* Elasticsearchが推測して自動的にマッピングを定義してくれるため、事前定義は必ずしも必要ではありません
-
-:::message
-**ドキュメントタイプ（Document Type）**
+:::details ドキュメントタイプ（Document Type）
 古い情報だとドキュメントタイプという概念が出てきますが、最新のバージョンでは完全に廃止となっています。
 ドキュメントタイプは 1つのインデックスの中に複数のマッピングを持たせられるというものでしたが、この仕組みは分かりづらく、インデックスを分けたほうがよいという考えが主流になり、廃止されることになりました。
 :::
 
-## 物理的な概念
+## Elasticsearchの物理的な概念
+
+Elasticsearch が実際にどういった物理的なリソースで構成されているかを見ていきます。
 
 ![](/images/elasticsearch/elasticsearch-1.drawio.png)
 
@@ -63,54 +66,43 @@ https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-types.ht
 | クラスタ    | 協調して動作するノードグループ | 
 | ノード | Elasticsearchが動作する各サーバー | 
 | プリマリシャード | インデックスのデータを分割したもの   | 
-| レプリカシャード | シャードの複製   | 
+| レプリカシャード | プライマリシャードの複製   | 
+
+### クラスタ
+
+クラスタ構成
 
 ### ノード
 
-Elasticsearchには、下記のノードのロールがあり、デフォルトではすべて ON になっています。
-
-* master
-* data
-* data_content
-* data_hot
-* data_warm
-* data_cold
-* data_frozen
-* ingest
-* ml
-* remote_cluster_client
-* transform
+Elasticsearchでは、様々なノードのロールが用意されており、そこから選択して、ノードの役割を決定します。
 
 https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.html#node-roles
 
-#### 
+代表的なものをいくつか紹介します。
+
+#### Master(Master-eligible)ノード
 ```yml:elasticsearch.yml
 node.roles: [ master ]
 ```
 
-#### 
+#### Data ノード
 ```yml:elasticsearch.yml
 node.roles: [ data ]
 ```
 
+Dataノードはシャードを保持し、CRUDを実行します。高スペックが必要（特にメモリ）になるので注意しましょう。
 
-#### Coordinating only node
+#### Coordinating only ノード
 ```yml:elasticsearch.yml
 node.roles: [ ]
 ```
 
-|  ノードの種別      | 役割の概要                 | 
-| -------- | --------------------------- | 
-| Master(Master-eligible)    | ・Masterノード<br>・Master候補ノード | 
-| Data | ・シャードの保持<br>・クエリへの応答<br>・etc... | 
-| Ingest | ・データの変換や加工処理<br>・LogstashやFluentdのようなイメージ<br>・[LogstashとElasticsearchのIngestノード、どちらを使うべき？ - Elastic Blog](https://www.elastic.co/jp/blog/should-i-use-logstash-or-elasticsearch-ingest-nodes)  | 
-| Coordinating only | ・ロードバランサー  | 
-| Machine Learning | ・様々な機械学習ジョブを実行できる<br>・OSS版では設定不可  | 
+Elasticsearch のノードは Coordinating と呼ばれる共通の役割を持っています。
 
+Coordinating は、クライアントリクエストのハンドリング処理です。
+具体的には、格納すべきシャードへのルーティングであったり、各シャードからのレスポンスを集約してクライアントに応答したりといった処理です。
 
-
-
-
+これはすべてのノードに必要であるため、自動的に割り当てられる無効にできないロールと捉えるとよいでしょう。つまり、`node.roles`で何も指定しなかった場合、Coordinating only というロードバランサーの様な役割を担うノードになります。
 
 ### シャード
 :::message
@@ -133,7 +125,7 @@ p.65
 Document Typeは廃止
 https://www.uipath.com/ja/community-blog/knowledge-base/elasticsearch-index-template
 
-## ユースケース
+## Elasticsearchのユースケース例
 実際に私がプロジェクトで構築したシステムを参考にユースケースを見ていきましょう。
 
 ![](/images/elasticsearch/elasticsearch-usecase.drawio.png)
