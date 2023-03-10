@@ -1,5 +1,5 @@
 ---
-title: "Elasticsearchの基本概念とユースケース（実例）をまとめる"
+title: "Elasticsearchの基本構成要素とユースケース（実例）をまとめる"
 emoji: "📚"
 type: "tech" # tech: 技術記事 / idea: アイデア
 topics: [elasticsearch, kibana, fluentd, kubernetes]
@@ -7,7 +7,7 @@ published: false
 ---
 
 ## 本記事について
-タイトルの通り、Elasticsearchを知らない人に向けた、Elasticsearchの基本概念とユースケース紹介記事です。
+タイトルの通り、Elasticsearchを知らない人に向けた、Elasticsearchの基本構成要素とユースケース紹介記事です。
 
 ## Elasticsearchの概要・特徴
 * Javaで書かれている全文検索ソフトウェア
@@ -20,17 +20,17 @@ published: false
 
 :::message
 **索引型検索**
-事前に文書を高速に検索できるような索引を構成しておき、検索時
+事前に文書を高速に検索できるような索引を構成しておき、検索時にはその索引をキーに目的のデータを探す方式です。Elasticsearchでは、[転置インデックス](https://gihyo.jp/dev/serial/01/search-engine/0003)の仕組みが利用されています。
 :::
 
 :::message
 **シャーディング**
-格納するデータ量が増大するにつれて、サーバーのCPU、メモリ、I/O負荷が上昇して、性能が徐々に低下することがあります。このとき、保持するデータを分割し、複数台のサーバーに分散配置することで1台あたりの負荷を減らすことができます。この仕組みは一般的にシャーディングと呼ばれており、Elasticsearchにおいても実現されています。
+格納するデータ量が増大するにつれて、サーバーのCPU、メモリ、I/O負荷が上昇して、性能が徐々に低下することがあります。このとき、保持するデータを分割し、複数台のサーバーに分散配置することで1台あたりの負荷を減らすことができます。この仕組みを一般的にシャーディングと呼んでいます。
 :::
 
-## Elasticsearchの論理的な概念
+## Elasticsearchの論理的構成要素
 
-まずは Elasticsearchの論理的な概念（見かけ上の
+まずは Elasticsearchの論理的構成要素（人間が扱いやすいよう見かけ上の
 
 ![](/images/elasticsearch/elasticsearch-0.drawio.png)
 
@@ -43,8 +43,6 @@ published: false
 ### インデックス
 * ドキュメントを保存する場所のこと
 * 検索を効率的に行うために転置インデックスを構成したり、さまざまなデータ形式で保存されています
-
-https://gihyo.jp/dev/serial/01/search-engine/0003
 
 ### ドキュメント
 * ドキュメントはJSONオブジェクトです
@@ -69,11 +67,11 @@ https://gihyo.jp/dev/serial/01/search-engine/0003
 https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
 
 :::details ドキュメントタイプ（Document Type）
-古い情報だとドキュメントタイプという概念が出てきますが、最新のバージョンでは完全に廃止となっています。
+古い情報だとドキュメントタイプとい構成要素が出てきますが、最新のバージョンでは完全に廃止となっています。
 ドキュメントタイプは 1つのインデックスの中に複数のマッピングを持たせられるというものでしたが、この仕組みは分かりづらく、インデックスを分けたほうがよいという考えが主流になり、廃止されることになりました。
 :::
 
-## Elasticsearchの物理的な概念
+## Elasticsearchの物理的構成要素
 
 Elasticsearch が実際にどういった物理的なリソースで構成されているかを見ていきます。
 
@@ -187,3 +185,4 @@ https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html
 https://www.amazon.co.jp/Elastic-Stack%E5%AE%9F%E8%B7%B5%E3%82%AC%E3%82%A4%E3%83%89-Elasticsearch-Kibana%E7%B7%A8-gear%E3%82%B7%E3%83%AA%E3%83%BC%E3%82%BA-ebook/dp/B08FBVG11T/ref=tmm_kin_swatch_0?_encoding=UTF8&qid=&sr=
 
 体系的に学ぶためにはやはり書籍が有効です。情報が古い以外は特に文句がなく、基本の理解やリファレンスとしても有用です。この書籍で基本を勉強し、公式ドキュメントで補完する形がよいかと思います。（今ならKindle Unlimitedで無料で読めます。）
+
