@@ -1,14 +1,32 @@
 ---
-title: "Elasticsearchの基本概念とユースケースをまとめる"
+title: "Elasticsearchの基本概念とユースケース（実例）をまとめる"
 emoji: "📚"
 type: "tech" # tech: 技術記事 / idea: アイデア
 topics: [elasticsearch, kibana, fluentd, kubernetes]
 published: false
 ---
 
-## 本記事の目的
+## 本記事について
+タイトルの通り、Elasticsearchを知らない人に向けた、Elasticsearchの基本概念とユースケース紹介記事です。
 
-## Elasticsearchの概要
+## Elasticsearchの概要・特徴
+* Javaで書かれている全文検索ソフトウェア
+* 索引型検索による高速な検索を実現
+* クラスタ構成・シャーディングによって高可用性を実現
+* REST APIによるアクセスが可能
+* データはJSON形式
+* Query DSLというJSON形式の言語で検索が可能
+* ログ収集・可視化などの様々なエコシステムと連携が可能
+
+:::message
+**索引型検索**
+事前に文書を高速に検索できるような索引を構成しておき、検索時
+:::
+
+:::message
+**シャーディング**
+格納するデータ量が増大するにつれて、サーバーのCPU、メモリ、I/O負荷が上昇して、性能が徐々に低下することがあります。このとき、保持するデータを分割し、複数台のサーバーに分散配置することで1台あたりの負荷を減らすことができます。この仕組みは一般的にシャーディングと呼ばれており、Elasticsearchにおいても実現されています。
+:::
 
 ## Elasticsearchの論理的な概念
 
@@ -78,12 +96,19 @@ Elasticsearchでは、様々なノードのロールが用意されており、�
 
 https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.html#node-roles
 
-代表的なものをいくつか紹介します。
+代表的なものを、設定ファイル（`elasticsearch.yml`）の記述と共にいくつか紹介します。
 
-#### Master(Master-eligible)ノード
+#### Master-eligible ノード
 ```yml:elasticsearch.yml
 node.roles: [ master ]
 ```
+* Masterノードの役割
+    * ノードの参加と離脱の管理（ヘルスチェック）
+    * クラスタメタデータの管理
+    * シャードの割当と再配置
+
+Elasticsearchクラスタには、必ず1台のMasterノードが必要で、Master-eligibleノードの中から、選定アルゴリズムによって決定されます。
+つまり、Masterノードが停止してしまった際にも選定アルゴリズムによって、Master-eligibleノードから別のMasterノードが選定され、クラスタ構成が保たれるということです。
 
 #### Data ノード
 ```yml:elasticsearch.yml
@@ -150,3 +175,15 @@ https://www.uipath.com/ja/community-blog/knowledge-base/elasticsearch-index-temp
 スタンダードな全文検索システムとしての事例はこちら↓
 https://www.elastic.co/jp/customers/nikkei-1
 :::
+
+## 参考
+
+### Elasticsearch Guide
+https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html
+
+まずは一次情報が大事です。
+
+### Elastic Stack実践ガイド[Elasticsearch/Kibana編]
+https://www.amazon.co.jp/Elastic-Stack%E5%AE%9F%E8%B7%B5%E3%82%AC%E3%82%A4%E3%83%89-Elasticsearch-Kibana%E7%B7%A8-gear%E3%82%B7%E3%83%AA%E3%83%BC%E3%82%BA-ebook/dp/B08FBVG11T/ref=tmm_kin_swatch_0?_encoding=UTF8&qid=&sr=
+
+体系的に学ぶためにはやはり書籍が有効です。情報が古い以外は特に文句がなく、基本の理解やリファレンスとしても有用です。この書籍で基本を勉強し、公式ドキュメントで補完する形がよいかと思います。（今ならKindle Unlimitedで無料で読めます。）
