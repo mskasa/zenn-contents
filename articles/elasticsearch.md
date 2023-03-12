@@ -62,16 +62,12 @@ https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl.html
 
 |  用語      | 概説                     | 
 | -------- | --------------------------- | 
-| クラスタ    | 協調して動作するノードグループ | 
-| ノード | Elasticsearchが動作する各サーバー | 
-| プリマリシャード | インデックスのデータを分割したもの   | 
-| レプリカシャード | プライマリシャードの複製   | 
+| クラスタ    | ・協調して動作するノードグループ | 
+| ノード | ・Elasticsearchが動作する各サーバー<br>・様々な役割を持たせられる | 
+| プライマリシャード | ・インデックスのデータを分割したもの   | 
+| レプリカシャード | ・プライマリシャードの複製<br>・自動的にプライマリシャードのあるノードとは異なるノードに配置される<br>・プライマリシャードが消失した際、自動でプライマリシャードに昇格する   | 
 
-### クラスタ
-
-クラスタ構成
-
-### ノード
+### Node roles
 
 Elasticsearchでは、様々なノードのロールが用意されており、そこから選択して、ノードの役割を決定します。
 
@@ -79,7 +75,7 @@ https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.htm
 
 代表的なものを、設定ファイル（`elasticsearch.yml`）の記述と共にいくつか紹介します。
 
-#### Master-eligible ノード
+#### Master-eligible node
 ```yml:elasticsearch.yml
 node.roles: [ master ]
 ```
@@ -91,31 +87,44 @@ node.roles: [ master ]
 Elasticsearchクラスタには、必ず1台のMasterノードが必要で、Master-eligibleノードの中から、選定アルゴリズムによって決定されます。
 つまり、Masterノードが停止してしまった際にも選定アルゴリズムによって、Master-eligibleノードから別のMasterノードが選定され、クラスタ構成が保たれるということです。
 
-#### Data ノード
+https://www.elastic.co/guide/en/elasticsearch/reference/8.6/modules-discovery-voting.html
+
+#### Data node
 ```yml:elasticsearch.yml
 node.roles: [ data ]
 ```
 
-Dataノードはシャードを保持し、CRUDを実行します。高スペックが必要（特にメモリ）になるので注意しましょう。
+Dataノードはシャードを保持し、CRUDを実行します。検索基盤として高パフォーマンスを維持するためには、非常に高性能な Dataノードが必要になります。
 
-#### Coordinating only ノード
+* ストレージ
+    * 高速なI/O処理が必要なため、SSD推奨
+    * RAIDを構成する場合
+        * ストライピングでパフォーマンスを上げる
+        * ミラーリングは不要（Elasticsearch 自体の機能であるレプリカで対応）
+* CPU
+    * 検索（search）や集計（aggregation）処理には多くの計算リソースが必要
+* メモリ
+    * 主に以下を考慮する
+        * OS のページキャッシュ
+        * Elasticsearch の JVM に割り当てるヒープサイズ
+
+https://www.elastic.co/jp/blog/elasticsearch-caching-deep-dive-boosting-query-speed-one-cache-at-a-time
+
+#### Coordinating only node
 ```yml:elasticsearch.yml
 node.roles: [ ]
 ```
 
 Elasticsearch のノードは Coordinating と呼ばれる共通の役割を持っています。
 
-Coordinating は、クライアントリクエストのハンドリング処理です。
-具体的には、格納すべきシャードへのルーティングであったり、各シャードからのレスポンスを集約してクライアントに応答したりといった処理です。
+* Coordinating は、クライアントリクエストのハンドリング処理のこと
+    * 具体的には…
+        * 格納すべきシャードへのルーティング
+        * 各シャードからのレスポンスの集約およびクライアントへの応答
 
 これはすべてのノードに必要であるため、自動的に割り当てられる無効にできないロールと捉えるとよいでしょう。つまり、`node.roles`で何も指定しなかった場合、Coordinating only というロードバランサーの様な役割を担うノードになります。
 
-#### プライマリシャード
-
-#### レプリカシャード
-
-
-## Elasticsearchのユースケース例
+## Elasticsearchのユースケース（実例）
 実際に私がプロジェクトで構築したシステムを参考にユースケースを見ていきましょう。
 
 ![](/images/elasticsearch/elasticsearch-usecase.drawio.png)
@@ -137,31 +146,14 @@ Coordinating は、クライアントリクエストのハンドリング処理�
 上図の Web/APIサーバー群 → ログ収集サーバー について。
 ここでは、Kubernetes環境で分散された各コンテナのログについて、サイドカーの fluentd で取り込み、ログ収集サーバーに送信しています。そして、ログ収集サーバー側の fluentd（td-agent）で受け取ったログから Elaticsearch のインデックスを作成し、Kibana を用いた GUI でログを解析します。分散したログを集約し、ユーザビリティの高い GUI で横断検索ができるという点がポイントです。
 
-:::message
-スタンダードな全文検索システムとしての事例はこちら↓
-https://www.elastic.co/jp/customers/nikkei-1
-:::
-
-## 参考
-
-### Elasticsearch Guide
-https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html
-
-まずは一次情報が大事です。
+## 概要をつかんだところで…
 
 ### Elastic Stack実践ガイド[Elasticsearch/Kibana編]
 https://book.impress.co.jp/books/1119101078
 
-体系的に学ぶためにはやはり書籍が有効です。情報が古い以外は特に文句がなく、基本の理解やリファレンスとしても有用です。この書籍で基本を勉強し、公式ドキュメントで補完する形がよいかと思います。（今ならKindle Unlimitedで無料で読めます。）
+この書籍は情報が古い以外は特に文句がなく、体系的に学ぶためにとても有用です（今ならKindle Unlimitedで無料で読めます）。
 
-## Masterノードの選定
+### Elasticsearch Guide
+https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html
 
-## シャード分割とレプリカ
-p.65
-
-
-```json:example
- { "name" : "Taro", "age" : 30, "email" : "taro@gmail.com" } 
- { "name" : "Hanako", "age" : 20, "email" : "hanako@gmail.com" } 
- { "name" : "Satoshi", "age" : 10, "email" : "satoshi@gmail.com" } 
-```
+一次情報。リファレンスとして。
