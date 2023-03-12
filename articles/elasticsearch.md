@@ -39,52 +39,12 @@ https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl.html
 ![](/images/elasticsearch/elasticsearch-0.drawio.png)
 *Elasticsearchの論理的構成要素*
 
-|  用語      | ざっくりとしたイメージ              | 
+|  用語      | 概説              | 
 | -------- | --------------------------- | 
-| インデックス    | RDB でいうテーブル | 
-| ドキュメント | RDB でいうレコード | 
-| フィールド    | RDB でいうカラム   | 
-
-### インデックス
-* ドキュメントを保存する場所のこと
-* 検索を効率的に行うために転置インデックスを構成したり、さまざまなデータ形式で保存されています
-
-```json:example
-{
-  "mappings": {
-    "properties": {
-      "name": { "type": "text" },
-      "age": { "type": "short" },
-      "email": { "type": "keyword" }
-    }
-  }
-}
-```
-
-### ドキュメント
-* JSONオブジェクト
-* 1つ以上のフィールドで構成されます
-
-```json:example
-{
-    "name" : "Taro",
-    "age" : 30,
-    "email" : "taro@gmail.com"
-}
-```
-
-### フィールド
-* ドキュメント内の`key=value`の組をフィールドと呼びます
-* さまざまなデータ型がサポートされており、マッピングを定義することで型を指定します
-    * マッピング
-        * インデックスの設定項目の1つ
-        * ドキュメント内の各フィールドのデータ構造や型を記述した情報のこと
-
-```json:example
-"name" : "Taro"
-```
-
-https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
+| インデックス    | ・RDB でいうテーブルのようなもの<br>・ドキュメントを保存する場所 | 
+| ドキュメント | ・RDB でいうレコードのようなもの<br>・JSONオブジェクト<br>・1つ以上のフィールドで構成される | 
+| フィールド    | ・RDB でいうカラムのようなもの<br>・ドキュメント内の Key=Value の組<br>・さまざまなデータ型がサポートされている  | 
+| マッピング    | ・インデックスの設定項目の1つ<br>・ドキュメントのデータ構造、ドキュメント内の各フィールドの型を定義している | 
 
 :::details ドキュメントタイプ（Document Type）について
 古い情報だとドキュメントタイプという構成要素が出てきますが、最新のバージョンでは完全に廃止となっています。
