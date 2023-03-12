@@ -11,8 +11,8 @@ published: false
 
 ## Elasticsearchの概要・特徴
 * Javaで書かれている全文検索ソフトウェア
-* 索引型検索による高速な検索を実現
-* クラスタ構成・シャーディングによって高可用性を実現
+* 索引型検索による高速検索
+* クラスタ構成・シャーディングによる高可用性
 * REST APIによるアクセスが可能
 * データはJSON形式
 * Query DSLというJSON形式の言語で検索が可能
@@ -28,13 +28,16 @@ published: false
 格納するデータ量が増大するにつれて、サーバーのCPU、メモリ、I/O負荷が上昇し、性能が徐々に低下することがあります。このとき、保持するデータを分割し、複数台のサーバーに分散配置することで 1台あたりの負荷を減らすことができます。この仕組みを一般的にシャーディングと呼んでいます。
 :::
 
+https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl.html
+
 ## Elasticsearch の論理的構成要素
 
 まずは Elasticsearchの論理的構成要素から見ていきます。
 論理的構成要素は、主に Elasticsearchを利用する上で必要な知識となってきます。
-論理的構成要素さえ分かれば、リファレンスを見ながら Elasticsearchを使えるようになるでしょう。
+論理的構成要素さえ分かれば、Elasticsearchをある程度使えるようになります。
 
 ![](/images/elasticsearch/elasticsearch-0.drawio.png)
+*Elasticsearchの論理的構成要素*
 
 |  用語      | ざっくりとしたイメージ              | 
 | -------- | --------------------------- | 
@@ -45,6 +48,18 @@ published: false
 ### インデックス
 * ドキュメントを保存する場所のこと
 * 検索を効率的に行うために転置インデックスを構成したり、さまざまなデータ形式で保存されています
+
+```json:example
+{
+  "mappings": {
+    "properties": {
+      "name": { "type": "text" },
+      "age": { "type": "short" },
+      "email": { "type": "keyword" }
+    }
+  }
+}
+```
 
 ### ドキュメント
 * JSONオブジェクト
@@ -65,6 +80,10 @@ published: false
         * インデックスの設定項目の1つ
         * ドキュメント内の各フィールドのデータ構造や型を記述した情報のこと
 
+```json:example
+"name" : "Taro"
+```
+
 https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
 
 :::details ドキュメントタイプ（Document Type）について
@@ -79,6 +98,7 @@ https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-types.ht
 物理的構成要素を理解すれば、Elasticsearchを利用したシステムを構築できるでしょう。
 
 ![](/images/elasticsearch/elasticsearch-1.drawio.png)
+*Elasticsearchの物理的構成要素*
 
 |  用語      | 概説                     | 
 | -------- | --------------------------- | 
@@ -135,20 +155,11 @@ Coordinating は、クライアントリクエストのハンドリング処理�
 #### レプリカシャード
 
 
-
-## Masterノードの選定
-
-## シャード分割とレプリカ
-p.65
-
-
-Document Typeは廃止
-https://www.uipath.com/ja/community-blog/knowledge-base/elasticsearch-index-template
-
 ## Elasticsearchのユースケース例
 実際に私がプロジェクトで構築したシステムを参考にユースケースを見ていきましょう。
 
 ![](/images/elasticsearch/elasticsearch-usecase.drawio.png)
+*Elasticsearchのユースケース（実例）*
 
 ### Relational Database の検索における wrapper としての役割
 
@@ -179,7 +190,18 @@ https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html
 まずは一次情報が大事です。
 
 ### Elastic Stack実践ガイド[Elasticsearch/Kibana編]
-https://www.amazon.co.jp/Elastic-Stack%E5%AE%9F%E8%B7%B5%E3%82%AC%E3%82%A4%E3%83%89-Elasticsearch-Kibana%E7%B7%A8-gear%E3%82%B7%E3%83%AA%E3%83%BC%E3%82%BA-ebook/dp/B08FBVG11T/ref=tmm_kin_swatch_0?_encoding=UTF8&qid=&sr=
+https://book.impress.co.jp/books/1119101078
 
 体系的に学ぶためにはやはり書籍が有効です。情報が古い以外は特に文句がなく、基本の理解やリファレンスとしても有用です。この書籍で基本を勉強し、公式ドキュメントで補完する形がよいかと思います。（今ならKindle Unlimitedで無料で読めます。）
 
+## Masterノードの選定
+
+## シャード分割とレプリカ
+p.65
+
+
+```json:example
+ { "name" : "Taro", "age" : 30, "email" : "taro@gmail.com" } 
+ { "name" : "Hanako", "age" : 20, "email" : "hanako@gmail.com" } 
+ { "name" : "Satoshi", "age" : 10, "email" : "satoshi@gmail.com" } 
+```
