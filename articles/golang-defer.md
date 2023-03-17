@@ -16,32 +16,33 @@ Go言語の`defer`の挙動や仕様を確認する簡単なコードを作成�
 ### 問題１
 
 ```go
-func funcX() {
-	fmt.Print("A")
-}
-func funcY(s string) {
+func funcX(s string) {
 	fmt.Print(s)
 }
-func funcZ(s string) func() {
+func funcY(s string) func() {
 	fmt.Print(s)
-	return func() { fmt.Print("B") }
+	return func() { fmt.Print("Y") }
 }
 func main() {
-	defer funcX()
-	s := "C"
+	s := "A"
+	defer funcX(s)
+	s = "B"
+	defer funcX(s)
 	defer funcY(s)
-	s = "D"
-	defer funcZ(s)
-	defer funcZ(s)()
+	defer funcY(s)()
+	defer func() {
+		s = "C"
+		fmt.Print(s)
+	}()
 }
 ```
 
 :::details 正解を見る
 * 正解:
 	```
-	DBDCA
+	BCYBBA
 	```
-* Go Playground: https://go.dev/play/p/bxxdw3bRf10
+* Go Playground: https://go.dev/play/p/zZdvqsi6Onv
 :::
 
 ### 問題２
@@ -100,9 +101,8 @@ func main() {
 :::
 
 ## 解説
-### 無名関数
-`defer` は下記の様に、無名関数とよく組み合わせて使用されます。
-最後の括弧の必要性が分かっている人は、この章を読み飛ばしてください。
+### 番外編：無名関数について
+そもそも無名関数の理解が曖昧だと、各問題の解説を読んでもピンとこないと思います。例えば、`defer`でよく見る下の形は無名関数を使っています。
 ```go
 defer func() {
 	s = "C"
@@ -129,33 +129,72 @@ func() {
 後は`defer`が前に付いているか付いていないかの違いだけですね。
 
 ### 問題１
-ポイント別に分解して見ていきましょう。
+下記の理解を確認する問題です。
+1. `defer`の実行順序
+1. `defer`に渡した関数の引数の評価タイミング
+
+ポイント別に見ていきましょう。
 #### １．defer の実行順序
-```go
-func main() {
-	defer funcX()	  // 4番目
-	defer funcY(s)	  // 3番目
-	defer funcZ(s)	  // 2番目
-	defer funcZ(s)()  // 1番目
-}
-```
-`defer`は LIFO（スタック）のデータ構造になっています。
-よって、`funcZ(s)()` → `funcZ(s)` → `funcY(s)` → `funcX()` の順に実行されます。
+`defer`は、関数が`return`された後や関数の末尾に到達した後に、与えられた処理を実行する制御構文です。また、`defer`は LIFO（スタック）のデータ構造になっています。
+![](/images/golang-defer/golang-defer.drawio.png)
 
-#### ２．関数から関数（クロージャ）を返す
+上図の紫の線が通常の実行順序で、青の線が`defer`の実行順序になります。
+よって、`funcY(s)` → `func()` → `funcY(s)()` → `funcY(s)` → `funcX(s)` → `funcX(s)` の順に実行されます。
+
+問題１のコードを再掲します。
 ```go
-func funcZ(s string) func() {
+func funcX(s string) {
 	fmt.Print(s)
-	return func() { fmt.Print("B") }
+}
+func funcY(s string) func() {
+	fmt.Print(s)
+	return func() { fmt.Print("Y") }
 }
 func main() {
-	defer funcZ(s)()
+	s := "A"
+	defer funcX(s)
+	s = "B"
+	defer funcX(s)
+	defer funcY(s)
+	defer funcY(s)()
+	defer func() {
+		s = "C"
+		fmt.Print(s)
+	}()
 }
 ```
-`defer` から若干話がそれてしまいますが `funcZ(s)()` について補足しておきます。
 
+* `funcY(s)`
+	* `B`を表示して、無名関数を返します
+* `func()`
+	* `C`を表示します
+* `funcY(s)()`
+	* `funcY`の戻り値である無名関数を実行し、`Y`を表示します
+* `funcY(s)`
+	* `B`を表示して、無名関数を返します
+	* ここで返された無名関数は実行されていません
+* `funcX(s)`
+	* `B`を表示します
+* `funcX(s)`
+	* `A`を表示します
+	* ここが`A`になる理由が２つ目のポイントです
 
-#### ３．defer に渡した関数の引数は即時評価される
+#### ２．defer に渡した関数の引数は即時評価される
+```go
+func funcX(s string) {
+	fmt.Print(s)
+}
+func main() {
+	s := "A"
+	defer funcX(s)
+	s = "B"
+	defer funcX(s)
+}
+```
+復習ですが、`defer`は、関数が`return`された後や関数の末尾に到達した後に、与えられた処理を実行する制御構文でした。
+関数が最後まで実行された段階では、変数`s`には`B`という値が入っています。その場合、１つ目の`funcX(s)`の処理でも`B`が表示されそうですが、実際は`A`が表示されます。
+これは **「defer に渡した関数の引数は即時評価される」** という仕様があるからです。
+そもそも変数への再代入は避けるべきなので、綺麗なコードを書けていたらこのような問題に遭遇することも少ないでしょう。頭の片隅に入れておけばよいと思います。
 
 ### 問題２
 ### 問題３
