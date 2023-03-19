@@ -3,7 +3,8 @@ title: "Go言語 deferの理解を確認する基本問題3選"
 emoji: "🚀"
 type: "tech" # tech: 技術記事 / idea: アイデア
 topics: [go, 初心者]
-published: false
+published: true
+published_at: 2023-03-20 07:00
 ---
 
 ## 概要
