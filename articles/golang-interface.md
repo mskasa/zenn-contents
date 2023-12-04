@@ -16,6 +16,37 @@ Go言語におけるインタフェースの活用方法について、実際の
 
 ## 多態性（ポリモーフィズム）
 
+異なるタイプのオブジェクトに対して同じインターフェースを使って操作を行うことができ
+
+```go
+type Shape interface {
+    Area() float64
+}
+
+type Circle struct {
+    Radius float64
+}
+
+func (c Circle) Area() float64 {
+    return math.Pi * c.Radius * c.Radius
+}
+
+type Rectangle struct {
+    Width, Height float64
+}
+
+func (r Rectangle) Area() float64 {
+    return r.Width * r.Height
+}
+
+func main() {
+    shapes := []Shape{Circle{Radius: 5}, Rectangle{Width: 3, Height: 4}}
+    for _, shape := range shapes {
+        fmt.Printf("Area: %.2f\n", shape.Area())
+    }
+}
+```
+
 ## 依存性の注入（DI）
 
 ```go
@@ -159,3 +190,17 @@ func performLogging(l Logger) {
     }
 }
 ```
+
+## まとめ
+
+ここまで説明してきましたが、最後にインタフェースのデメリットを述べておくと、「実装が複雑になる」ということがあげられます。
+
+よって、本稿の内容を理解した上で、インタフェースの要否を判断しましょう
+（個人的には、インタフェースを使わずにコードを書いておき、必要だと分かった段階で利用する形に書き換える程度のスタンスでよいと思います）。
+
+よって、至極当然のことですが、インタフェースが必要であれば使用する
+ただし、必要かどうかの判断には、本稿の内容程度は理解しておかないといけないということです。
+
+過剰に複雑な実装をするぐらいなら、インタフェースを使わずにコードを書くという指針で十分です。
+具体的に、実装が複数パターン出てくることが明らかになってから初めて書き換えるぐらいで良いと思います。
+すべてに通ずることですが、必要なら
