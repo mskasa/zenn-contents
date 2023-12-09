@@ -78,6 +78,16 @@ func main() {
 
 https://github.com/golang/go/blob/master/src/net/http/server.go#L86-L88
 
+```go
+type Handler interface {
+	ServeHTTP(ResponseWriter, *Request)
+}
+```
+```go
+func (mux *ServeMux) Handle(pattern string, handler Handler) {
+    ・・・（略）・・・
+}
+```
 
 拡張性と再利用性
 
