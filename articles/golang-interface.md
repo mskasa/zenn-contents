@@ -64,9 +64,13 @@ func main() {
 
 例えば、新しいエラーを追加する時、
 
-#### ハンドラ
+errorインターフェースは非常にシンプルです。唯一必要なのはError() stringメソッドを持つことです。この単純さにより、どんな型でも容易にエラーとしての機能を持たせることができます。
 
-例えば、新しいハンドラーを追加する時
+一度定義したエラータイプは、異なるプロジェクトやライブラリ間で再利用することができます。
+
+#### ハンドラー
+
+例えば、新しいハンドラーを追加する時、我々は以下のように実装します。
 ```go
 func hello(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintln(w, "Hello, world!")
@@ -75,19 +79,68 @@ func main() {
     http.HandleFunc("/hello", hello)
 }
 ```
+このように簡単に利用できる裏には、インタフェースの存在があります。
+httpパッケージのserver.goのソースを確認してみましょう。
 
-https://github.com/golang/go/blob/master/src/net/http/server.go#L86-L88
+https://github.com/golang/go/blob/master/src/net/http/server.go
+
+`http.HandleFunc`はパッケージレベルの関数で、`DefaultServeMux`というデフォルトの`ServeMux`インスタンスを使用して、メソッド`ServeMux.HandleFunc`を呼び出しています。
+
+```go
+func HandleFunc(pattern string, handler func(ResponseWriter, *Request)) {
+	DefaultServeMux.HandleFunc(pattern, handler)
+}
+
+func (mux *ServeMux) HandleFunc(pattern string, handler func(ResponseWriter, *Request)) {
+	if handler == nil {
+		panic("http: nil handler")
+	}
+	mux.Handle(pattern, HandlerFunc(handler))
+}
+```
+
+そして、メソッド`ServeMux.Handle`でハンドラーを登録します。注目すべきは引数の`Handler`です。
+
+```go
+func (mux *ServeMux) Handle(pattern string, handler Handler) {
+    ・・・（略）・・・
+}
+```
+
+これは、以下の様にインタフェース型で定義されています。
 
 ```go
 type Handler interface {
 	ServeHTTP(ResponseWriter, *Request)
 }
 ```
+
+今一度、メソッド`ServeMux.HandleFunc`を確認してみましょう。
+今回の例でいうところの、`hello(w http.ResponseWriter, r *http.Request)`を、`HandlerFunc(handler)`部分で、`HandlerFunc`型にキャストしています。
+
 ```go
-func (mux *ServeMux) Handle(pattern string, handler Handler) {
-    ・・・（略）・・・
+func (mux *ServeMux) HandleFunc(pattern string, handler func(ResponseWriter, *Request)) {
+	if handler == nil {
+		panic("http: nil handler")
+	}
+	mux.Handle(pattern, HandlerFunc(handler))
 }
 ```
+
+`HandlerFunc`型を確認してみると、シグネチャ`ServeHTTP(w ResponseWriter, r *Request)`を持つメソッドを持っているため、`Handler`インタフェースを実装しているということになります。
+
+```go
+type HandlerFunc func(ResponseWriter, *Request)
+
+func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request) {
+	f(w, r)
+}
+```
+
+以上が我々が簡単にハンドラーを追加できている裏の仕組みです。
+
+
+
 
 拡張性と再利用性
 
