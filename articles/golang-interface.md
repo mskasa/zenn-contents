@@ -166,6 +166,12 @@ https://zenn.dev/kasa/articles/golang-pacvim#%E9%AB%98%E9%9A%8E%E9%96%A2%E6%95%B
 また、誤解している方も多いですが、DI自体にインタフェースが必須というわけではありません。あくまで、DI でインタフェースを受け取り構造体を返すようにコード
 :::
 
+初期コード
+問題点説明
+DIコード
+テストコード
+インタフェースにして拡張
+
 ```go
 type Application struct {
 	logger ConsoleLogger // 直接 ConsoleLogger に依存
@@ -187,6 +193,50 @@ func main() {
 	}
 
 	app.Run() // 出力: Log to console: Application is running
+}
+```
+
+上記のコードの問題点は Application が直接 ConsoleLogger に依存していることです。
+
+```go
+type Application struct {
+	logger ConsoleLogger // 直接 ConsoleLogger に依存
+}
+```
+
+これにより、以下の問題が発生します。
+
+1. 単体テストが困難
+2. 拡張性の欠如
+
+特に 1つ目の問題は重大でしょう。この例ですと、ConsoleLogger の動作が Application のテスト結果に直接影響を与えるため、純粋な単体テストを行うのが非常に困難です。
+
+```go
+type Application struct {
+	logger ConsoleLogger
+}
+
+type ConsoleLogger struct{}
+
+func (l ConsoleLogger) Log(message string) {
+	fmt.Println("Log to console:", message)
+}
+
+func (app *Application) Run() {
+	app.logger.Log("Application is running")
+}
+
+func (app *Application) SetLogger(logger ConsoleLogger) {
+	app.logger = logger
+}
+
+func main() {
+	app := &Application{}
+
+	consoleLogger := ConsoleLogger{}
+	app.SetLogger(consoleLogger)
+
+	app.Run()
 }
 ```
 
