@@ -60,7 +60,13 @@ func main() {
 
 ただし、このような簡易的な例では、その恩恵を説明するのに限界があるため、普段我々がお世話になっている Goの標準ライブラリを例にしてみます。
 
-#### エラー
+#### errorインタフェース
+
+```go
+type error interface {
+	Error() string
+}
+```
 
 例えば、新しいエラーを追加する時、
 
@@ -68,7 +74,9 @@ errorインターフェースは非常にシンプルです。唯一必要なの
 
 一度定義したエラータイプは、異なるプロジェクトやライブラリ間で再利用することができます。
 
-#### ハンドラー
+これらはすべて、インタフェースが為せる技です。
+
+#### Handlerインタフェース
 
 例えば、新しいハンドラーを追加する時、我々は以下のように実装します。
 ```go
@@ -173,8 +181,34 @@ DIコード
 インタフェースにして拡張
 
 ```go
+type Application struct{}
+
+type ConsoleLogger struct{}
+
+func (l ConsoleLogger) Log(message string) {
+	fmt.Println("Log to console:", message)
+}
+
+func (app *Application) Run() {
+	logger := ConsoleLogger{}
+	logger.Log("Application is running")
+}
+
+func main() {
+	app := Application{}
+	app.Run()
+}
+```
+
+- 単体テストが困難
+- 拡張性の欠如
+
+ConsoleLogger の動作が Application のテスト結果に直接影響を与えるため、純粋な単体テストを行うのが難しくなります。
+テスト中に ConsoleLogger の振る舞いを制御することができないため、テストの再現性や精度が低下します。また、外部リソース（例えばコンソール出力）に依存するコードのテストは、モックやスタブを使用して内部依存関係を隔離する場合と比べて、一般的に複雑で時間がかかります。依存性注入を使用することで、これらの問題を回避し、より効率的で再現性の高いテストを実現できます。
+
+```go
 type Application struct {
-	logger ConsoleLogger // 直接 ConsoleLogger に依存
+	logger ConsoleLogger
 }
 
 type ConsoleLogger struct{}
@@ -191,8 +225,7 @@ func main() {
 	app := Application{
 		logger: ConsoleLogger{},
 	}
-
-	app.Run() // 出力: Log to console: Application is running
+	app.Run()
 }
 ```
 
@@ -247,75 +280,52 @@ ConsoleLogger の動作が Application のテスト結果に直接影響を与�
 テスト中に ConsoleLogger の振る舞いを制御することができないため、テストの再現性や精度が低下します。また、外部リソース（例えばコンソール出力）に依存するコードのテストは、モックやスタブを使用して内部依存関係を隔離する場合と比べて、一般的に複雑で時間がかかります。依存性注入を使用することで、これらの問題を回避し、より効率的で再現性の高いテストを実現できます。
 
 ```go
-package main
-
-import (
-    "fmt"
-)
-
-// Logger インタフェースはログ記録の機能を定義します。
 type Logger interface {
-    Log(message string)
+	Log(message string)
 }
 
-// ConsoleLogger は Logger インタフェースの一つの実装です。
+type Application struct {
+	logger Logger
+}
+
 type ConsoleLogger struct{}
 
 func (l ConsoleLogger) Log(message string) {
-    fmt.Println("Log to console:", message)
-}
-
-// Application は Logger の実装に依存しています。
-type Application struct {
-    logger Logger
-}
-
-func (app *Application) SetLogger(logger Logger) {
-    app.logger = logger
+	fmt.Println("Log to console:", message)
 }
 
 func (app *Application) Run() {
-    app.logger.Log("Application is running")
+	app.logger.Log("Application is running")
 }
 
 func main() {
-    app := &Application{}
-    
-    // コンソールロガーを注入
-    consoleLogger := ConsoleLogger{}
-    app.SetLogger(consoleLogger)
-
-    app.Run() // 出力: Log to console: Application is running
+	app := Application{
+		logger: ConsoleLogger{},
+	}
+	app.Run()
 }
 ```
 
 ```go
-package main
-
-import (
-    "testing"
-)
-
-// MockLogger はテスト用の Logger 実装です。
 type MockLogger struct {
-    LoggedMessages []string
+	LoggedMessages []string
 }
 
 func (l *MockLogger) Log(message string) {
-    l.LoggedMessages = append(l.LoggedMessages, message)
+	l.LoggedMessages = append(l.LoggedMessages, message)
 }
 
 func TestApplicationRun(t *testing.T) {
-    mockLogger := &MockLogger{}
-    app := &Application{
-        logger: mockLogger,
-    }
+	mockLogger := &MockLogger{}
+	app := &Application{
+		logger: mockLogger,
+	}
 
-    app.Run()
+	app.Run()
 
-    if len(mockLogger.LoggedMessages) != 1 || mockLogger.LoggedMessages[0] != "Application is running" {
-        t.Errorf("Expected 'Application is running' log message, got %v", mockLogger.LoggedMessages)
-    }
+	if len(mockLogger.LoggedMessages) != 1 || mockLogger.LoggedMessages[0] != "Application is running" {
+		t.Errorf("Expected 'Application is running' log message, got %v", mockLogger.LoggedMessages)
+	}
 }
 ```
 
