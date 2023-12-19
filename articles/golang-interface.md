@@ -220,6 +220,7 @@ func main() {
 これを解決するのが DIです。
 
 まずは以下のように、外部からインスタンスを渡してあげましょう。
+依存性(`ServiceB`への依存)を外から注入しています。
 
 ```diff go
 -type ServiceA struct{}
@@ -272,7 +273,8 @@ func main() {
 ```
 :::
 
-次に、インタフェースを定義し、
+しかし、まだ不完全です。
+なぜなら、具象型(`struct`)への依存だからです。抽象型である`interface`に依存することで、
 
 ```diff go
 type ServiceA struct {
