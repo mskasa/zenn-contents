@@ -170,10 +170,6 @@ https://zenn.dev/kasa/articles/golang-pacvim#%E9%AB%98%E9%9A%8E%E9%96%A2%E6%95%B
 
 このテクニックを使うとどんなメリットがあるのでしょうか。DIを利用していない場合と、利用した場合で比較してみましょう。
 
-:::message
-また、誤解している方も多いですが、DI自体にインタフェースが必須というわけではありません。あくまで、DI でインタフェースを受け取り構造体を返すようにコード
-:::
-
 初期コード
 問題点説明
 DIコード
@@ -212,6 +208,18 @@ func main() {
 	a.ProcessingA()
 }
 ```
+
+上記のコードは`ServiceA`の処理内で`ServiceB`を直接生成しています。
+そして、`ServiceB`の処理結果に応じて`ServiceA`の処理結果が変わります。
+
+つまり、`ServiceA`が`ServiceB`に依存しているわけです。
+その結果、`ServiceA`のテストをする際は`ServiceB`もテストすることとなるため、テストが失敗した際の問題の切り分けが難しくなります（単体テスト不可能な状態）。
+
+`ServiceB`が簡単な処理で、自チームで開発されているのであれば問題ないかもしれませんが、複雑な処理であったり、他チームが開発しているとなると、これは開発上の重大な問題になります。
+
+これを解決するのが DIです。
+
+まずは以下のように、外部からインスタンスを渡してあげましょう。
 
 ```diff go
 -type ServiceA struct{}
@@ -252,6 +260,19 @@ func main() {
 	a.ProcessingA()
 }
 ```
+
+:::details 差分表示なし TODO
+```go
+func main() {
+	a := ServiceA{
+		b: ServiceB{},
+	}
+	a.ProcessingA()
+}
+```
+:::
+
+次に、インタフェースを定義し、
 
 ```diff go
 type ServiceA struct {
