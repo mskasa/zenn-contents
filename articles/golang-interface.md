@@ -198,14 +198,12 @@ func (a ServiceA) ProcessingA() (string, error) {
 		return "hello", nil
 	case 1:
 		return "world", nil
-	default:
-		return "default", nil
 	}
 }
 
 func (b ServiceB) ProcessingB() (int, error) {
 	// 何か複雑でややこしい処理
-	// 0 以外が返ることもあるし、エラーが返ることもあるよ
+	// 0 or 1、エラーが返ることもあるよ
 	return 0, nil
 }
 
@@ -215,16 +213,20 @@ func main() {
 }
 ```
 
-```go
-type ServiceA struct {
-	ServiceBInstance ServiceB
-}
+```diff go
+-type ServiceA struct{}
++type ServiceA struct {
++	b ServiceB
++}
 
 type ServiceB struct{}
 
 func (a ServiceA) ProcessingA() (string, error) {
+-	// A の中で Bインスタンスを生成
+-	b := ServiceB{}
 	// ProcessingB の結果が影響
-	res, err := a.ServiceBInstance.ProcessingB()
+-   res, err := b.ProcessingB()
++	res, err := a.b.ProcessingB()
 	if err != nil {
 		return "", err
 	}
@@ -233,22 +235,126 @@ func (a ServiceA) ProcessingA() (string, error) {
 		return "hello", nil
 	case 1:
 		return "world", nil
-	default:
-		return "default", nil
 	}
 }
 
 func (b ServiceB) ProcessingB() (int, error) {
 	// 何か複雑でややこしい処理
-	// 0 以外が返ることもあるし、エラーが返ることもあるよ
+	// 0 or 1、エラーが返ることもあるよ
+	return 0, nil
+}
+
+func main() {
+-   a := ServiceA{}
++	a := ServiceA{
++		b: ServiceB{},
++	}
+	a.ProcessingA()
+}
+```
+
+```diff go
+type ServiceA struct {
+-   b ServiceB
++	b ServiceBInterface
+}
+
++type ServiceBInterface interface {
++	ProcessingB() (int, error)
++}
+
+type ServiceB struct{}
+
+func (a ServiceA) ProcessingA() (string, error) {
+	// ProcessingB の結果が影響
+	res, err := a.b.ProcessingB()
+	if err != nil {
+		return "", err
+	}
+	switch res {
+	case 0:
+		return "hello", nil
+	case 1:
+		return "world", nil
+	}
+}
+
+func (b ServiceB) ProcessingB() (int, error) {
+	// 何か複雑でややこしい処理
+	// 0 or 1、エラーが返ることもあるよ
 	return 0, nil
 }
 
 func main() {
 	a := ServiceA{
-		ServiceBInstance: ServiceB{},
+		b: ServiceB{},
 	}
 	a.ProcessingA()
+}
+```
+
+```go
+type MockServiceB struct {
+	Result int
+	Err    error
+}
+
+func (m MockServiceB) ProcessingB() (int, error) {
+	return m.Result, m.Err
+}
+
+func TestServiceAProcessingAWithTableDriven(t *testing.T) {
+	testCases := []struct {
+		name     string
+		mock     MockServiceB
+		expected string
+		hasError bool
+	}{
+		{
+			name: "Success with 'hello'",
+			mock: MockServiceB{
+				Result: 0,
+				Err:    nil,
+			},
+			expected: "hello",
+			hasError: false,
+		},
+		{
+			name: "Success with 'world'",
+			mock: MockServiceB{
+				Result: 1,
+				Err:    nil,
+			},
+			expected: "world",
+			hasError: false,
+		},
+		{
+			name: "Error with empty result",
+			mock: MockServiceB{
+				Result: 1,
+				Err:    errors.New("Error in ProcessingB"),
+			},
+			expected: "",
+			hasError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// テストケースごとに ServiceA にモックを注入
+			serviceA := ServiceA{b: tc.mock}
+
+			result, err := serviceA.ProcessingA()
+
+			if result != tc.expected {
+				t.Errorf("Expected %s, but got %s", tc.expected, result)
+			}
+
+			if (err != nil) != tc.hasError {
+				t.Errorf("Expected error status: %v, but got: %v", tc.hasError, err)
+			}
+		})
+	}
 }
 ```
 
