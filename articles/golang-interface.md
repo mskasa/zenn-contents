@@ -181,22 +181,74 @@ DIコード
 インタフェースにして拡張
 
 ```go
-type Application struct{}
+type ServiceA struct{}
 
-type ConsoleLogger struct{}
+type ServiceB struct{}
 
-func (l ConsoleLogger) Log(message string) {
-	fmt.Println("Log to console:", message)
+func (a ServiceA) ProcessingA() (string, error) {
+	// A の中で Bインスタンスを生成
+	b := ServiceB{}
+	// ProcessingB の結果が影響
+	res, err := b.ProcessingB()
+	if err != nil {
+		return "", err
+	}
+	switch res {
+	case 0:
+		return "hello", nil
+	case 1:
+		return "world", nil
+	default:
+		return "default", nil
+	}
 }
 
-func (app *Application) Run() {
-	logger := ConsoleLogger{}
-	logger.Log("Application is running")
+func (b ServiceB) ProcessingB() (int, error) {
+	// 何か複雑でややこしい処理
+	// 0 以外が返ることもあるし、エラーが返ることもあるよ
+	return 0, nil
 }
 
 func main() {
-	app := Application{}
-	app.Run()
+	a := ServiceA{}
+	a.ProcessingA()
+}
+```
+
+```go
+type ServiceA struct {
+	ServiceBInstance ServiceB
+}
+
+type ServiceB struct{}
+
+func (a ServiceA) ProcessingA() (string, error) {
+	// ProcessingB の結果が影響
+	res, err := a.ServiceBInstance.ProcessingB()
+	if err != nil {
+		return "", err
+	}
+	switch res {
+	case 0:
+		return "hello", nil
+	case 1:
+		return "world", nil
+	default:
+		return "default", nil
+	}
+}
+
+func (b ServiceB) ProcessingB() (int, error) {
+	// 何か複雑でややこしい処理
+	// 0 以外が返ることもあるし、エラーが返ることもあるよ
+	return 0, nil
+}
+
+func main() {
+	a := ServiceA{
+		ServiceBInstance: ServiceB{},
+	}
+	a.ProcessingA()
 }
 ```
 
