@@ -388,6 +388,32 @@ ConsoleLogger の動作が Application のテスト結果に直接影響を与�
 テスト中に ConsoleLogger の振る舞いを制御することができないため、テストの再現性や精度が低下します。また、外部リソース（例えばコンソール出力）に依存するコードのテストは、モックやスタブを使用して内部依存関係を隔離する場合と比べて、一般的に複雑で時間がかかります。依存性注入を使用することで、これらの問題を回避し、より効率的で再現性の高いテストを実現できます。
 
 ```go
+type Application struct{}
+
+type ConsoleLogger struct{}
+
+func (l ConsoleLogger) Log(message string) {
+	fmt.Println("Log to console:", message)
+}
+
+func (app *Application) Run() {
+	logger := ConsoleLogger{}
+	logger.Log("Application is running")
+}
+
+func main() {
+	app := Application{}
+	app.Run()
+}
+```
+
+- 単体テストが困難
+- 拡張性の欠如
+
+ConsoleLogger の動作が Application のテスト結果に直接影響を与えるため、純粋な単体テストを行うのが難しくなります。
+テスト中に ConsoleLogger の振る舞いを制御することができないため、テストの再現性や精度が低下します。また、外部リソース（例えばコンソール出力）に依存するコードのテストは、モックやスタブを使用して内部依存関係を隔離する場合と比べて、一般的に複雑で時間がかかります。依存性注入を使用することで、これらの問題を回避し、より効率的で再現性の高いテストを実現できます。
+
+```go
 type Application struct {
 	logger ConsoleLogger
 }
