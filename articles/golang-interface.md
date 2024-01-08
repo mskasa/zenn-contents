@@ -6,10 +6,11 @@ topics: [go]
 published: false
 ---
 
-インタフェースの役割は抽象化にあり、その抽象化が様々な恩恵をもたらします。
+
 
 ## インタフェースによる抽象化
 
+インタフェースの役割は抽象化にあり、その抽象化が様々な恩恵をもたらします。
 まずは以下のサンプルコードを見てください。
 
 ```go
@@ -42,11 +43,15 @@ func main() {
 ```
 
 この例では、異なる型である`Circle`と`Rectangle`が同じインタフェース`Shape`を通して、同一のシグネチャ`Area() float64`で異なる動作をします。
-「面積を求める」ことを抽象化（`Area`というメソッド名で、`float64`の値を返しさえすればOK）することで、図形の種類に関わらず、同じ方法（シグネチャ）で、そのオブジェクトを操作できるようになったわけです。
+「面積を求める」ことを抽象化すること（`Area`というメソッド名で、`float64`の値を返しさえすればOK）で、図形の種類に関わらず、同じ方法（シグネチャ）で、その型を操作できるようになったわけです。
+
+:::message
+「型」はオブジェクト指向言語における「オブジェクト」と捉えてください。
+:::
 
 ## インタフェースの抽象化によるメリット
 
-インタフェースがオブジェクトの振る舞いを抽象化することは分かりましたが、これが一体何の役に立つのでしょうか。今回はインタフェースの抽象化によってもたらされる以下2つの恩恵について解説しようと思います。
+インタフェースが型の振る舞いを抽象化することは分かりましたが、一体これが何の役に立つのでしょうか。今回はインタフェースの抽象化による恩恵を2つ紹介しようと思います。
 1. ソースコードの共通化
 2. 具体的な実装との分離
 
@@ -60,19 +65,22 @@ func main() {
 
 ### 具体的な実装との分離
 
+まずは以下のサンプルコードを見てください。
+
 ```go
 type ServiceA struct{}
 
 type ServiceB struct{}
 
 func (a ServiceA) ProcessingA() (string, error) {
-	// A の中で Bインスタンスを生成
+	// 型「ServiceB」を実装
 	b := ServiceB{}
-	// ProcessingB の結果が影響
+
 	res, err := b.ProcessingB()
 	if err != nil {
 		return "", err
 	}
+
 	switch res {
 	case 0:
 		return "hello", nil
@@ -93,32 +101,32 @@ func main() {
 }
 ```
 
-上記のコードは`ServiceA`の処理内で`ServiceB`を直接生成しています。
-そして、`ServiceB`の処理結果に応じて`ServiceA`の処理結果が変わります。
+上記のコードでは、型`ServiceA`のメソッド`ProcessingA`内で、型`ServiceB`を実装しています。
+そして、型`ServiceB`のメソッド`ProcessingB`の処理結果に応じて`ProcessingA`の処理結果が変わります。
+つまり、型`ServiceA`が型`ServiceB`に依存してしまっており、`ProcessingA`の単体テストが不可能な状態であるといえます。
 
-つまり、`ServiceA`が`ServiceB`に依存しているわけです。
-その結果、`ServiceA`のテストをする際は`ServiceB`もテストすることとなるため、テストが失敗した際の問題の切り分けが難しくなります（単体テスト不可能な状態）。
+`ServiceB`が簡単な処理で、自チームで開発されているのであれば問題ないかもしれません。
+しかし、複雑な処理であったり、他チームが開発しているとなると、これは開発上の大きな問題になります。
 
-`ServiceB`が簡単な処理で、自チームで開発されているのであれば問題ないかもしれませんが、複雑な処理であったり、他チームが開発しているとなると、これは開発上の大きな問題になります。
+これを解決するのが、オブジェクト指向言語でいうところの依存性の注入（Dependency Injection）になります。
+DIは難しくとらわれがちですが、ただ単に外部からインスタンスを渡してあげることに他なりません。
+Go はオブジェクト指向言語ではないため、オブジェクトやインスタンスという概念がありません。
+そのため「型」や「型の実装」という表現をここでは使用しますが、オブジェクト指向言語に慣れている方は「型」を「オブジェクト」、「型の実装」を「インスタンス」と読み替えていただくと咀嚼しやすいと思います。
 
-これを解決するのが DIです。
-
-まずは以下のように、外部からインスタンスを渡してあげましょう。
-依存性(`ServiceB`への依存)を外から注入しています。
+では、依存性(`ServiceB`への依存)を外部から注入するようにコードを変更してみます。
 
 ```diff go
--type ServiceA struct{}
-+type ServiceA struct {
-+	b ServiceB
-+}
+- type ServiceA struct{}
++ type ServiceA struct {
++ 	b ServiceB
++ }
 
 type ServiceB struct{}
 
 func (a ServiceA) ProcessingA() (string, error) {
 -	// A の中で Bインスタンスを生成
 -	b := ServiceB{}
-	// ProcessingB の結果が影響
--   res, err := b.ProcessingB()
+-	res, err := b.ProcessingB()
 +	res, err := a.b.ProcessingB()
 	if err != nil {
 		return "", err
@@ -138,27 +146,16 @@ func (b ServiceB) ProcessingB() (int, error) {
 }
 
 func main() {
--   a := ServiceA{}
+-	a := ServiceA{}
 +	a := ServiceA{
-+		b: ServiceB{},
++		b: ServiceB{},	// 型「ServiceB」の実装を注入
 +	}
 	a.ProcessingA()
 }
 ```
 
-:::details 差分表示なし TODO
-```go
-func main() {
-	a := ServiceA{
-		b: ServiceB{},
-	}
-	a.ProcessingA()
-}
-```
-:::
-
-しかし、まだ不完全です。
-なぜなら、具象型(`struct`)への依存だからです。抽象型である`interface`に依存することで、
+型`ServiceB`の実装を外部から渡すように変更できました。
+しかし、まだ不完全です。なぜなら、具象型(`struct`)への依存だからです。抽象型である`interface`に依存することで、
 
 ```diff go
 type ServiceA struct {
