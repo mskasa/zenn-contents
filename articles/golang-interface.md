@@ -10,36 +10,266 @@ published: false
 
 ## インタフェースによる抽象化
 
-このソースコードにおいて、
-
-```go
-func (r Rectangle) Area() float64 {
-    return r.Width * r.Height
-}
-```
+まずは以下のサンプルコードを見てください。
 
 ```go
 type Shape interface {
     Area() float64
 }
+
+type Circle struct {
+    Radius float64
+}
+
+func (c Circle) Area() float64 {
+    return math.Pi * c.Radius * c.Radius
+}
+
+type Rectangle struct {
+    Width, Height float64
+}
+
+func (r Rectangle) Area() float64 {
+    return r.Width * r.Height
+}
+
+func main() {
+    shapes := []Shape{Circle{Radius: 5}, Rectangle{Width: 3, Height: 4}}
+    for _, shape := range shapes {
+        fmt.Printf("Area: %.2f\n", shape.Area())
+    }
+}
 ```
 
-この例では、`Area() float64`というシグネチャによって、面積を計算する方法が抽象化されています。
-`Area`というメソッド名で、`float64`の値を返しさえすればOKですよということです。これが抽象化です。
+この例では、異なる型である`Circle`と`Rectangle`が同じインタフェース`Shape`を通して、同一のシグネチャ`Area() float64`で異なる動作をします。
+「面積を求める」ことを抽象化（`Area`というメソッド名で、`float64`の値を返しさえすればOK）することで、図形の種類に関わらず、同じ方法（シグネチャ）で、そのオブジェクトを操作できるようになったわけです。
 
-## 抽象化によるメリット
+## インタフェースの抽象化によるメリット
 
-何が嬉しいのでしょうか？
+インタフェースがオブジェクトの振る舞いを抽象化することは分かりましたが、これが一体何の役に立つのでしょうか。今回はインタフェースの抽象化によってもたらされる以下2つの恩恵について解説しようと思います。
+1. ソースコードの共通化
+2. 具体的な実装との分離
 
-より実用的な例を見ることでそのメリットが分かると思います。
+先程の簡易的な例では、その恩恵を説明するのに限界があるため、より実用的な例を見てみましょう。
+普段我々がお世話になっている Goの標準ライブラリの中から `io.Reader` を例にしてみます。
 
-### 共通化
+### ソースコードの共通化
 
 異なるデータソースからの読み取りを共通のインターフェースを通じて行うことで、コードの共通化が可能になります。
 インターフェースによる抽象化が、この共通化を可能にしています。
 
 ### 具体的な実装との分離
 
+```go
+type ServiceA struct{}
+
+type ServiceB struct{}
+
+func (a ServiceA) ProcessingA() (string, error) {
+	// A の中で Bインスタンスを生成
+	b := ServiceB{}
+	// ProcessingB の結果が影響
+	res, err := b.ProcessingB()
+	if err != nil {
+		return "", err
+	}
+	switch res {
+	case 0:
+		return "hello", nil
+	case 1:
+		return "world", nil
+	}
+}
+
+func (b ServiceB) ProcessingB() (int, error) {
+	// 何か複雑でややこしい処理
+	// 0 or 1、エラーが返ることもあるよ
+	return 0, nil
+}
+
+func main() {
+	a := ServiceA{}
+	a.ProcessingA()
+}
+```
+
+上記のコードは`ServiceA`の処理内で`ServiceB`を直接生成しています。
+そして、`ServiceB`の処理結果に応じて`ServiceA`の処理結果が変わります。
+
+つまり、`ServiceA`が`ServiceB`に依存しているわけです。
+その結果、`ServiceA`のテストをする際は`ServiceB`もテストすることとなるため、テストが失敗した際の問題の切り分けが難しくなります（単体テスト不可能な状態）。
+
+`ServiceB`が簡単な処理で、自チームで開発されているのであれば問題ないかもしれませんが、複雑な処理であったり、他チームが開発しているとなると、これは開発上の大きな問題になります。
+
+これを解決するのが DIです。
+
+まずは以下のように、外部からインスタンスを渡してあげましょう。
+依存性(`ServiceB`への依存)を外から注入しています。
+
+```diff go
+-type ServiceA struct{}
++type ServiceA struct {
++	b ServiceB
++}
+
+type ServiceB struct{}
+
+func (a ServiceA) ProcessingA() (string, error) {
+-	// A の中で Bインスタンスを生成
+-	b := ServiceB{}
+	// ProcessingB の結果が影響
+-   res, err := b.ProcessingB()
++	res, err := a.b.ProcessingB()
+	if err != nil {
+		return "", err
+	}
+	switch res {
+	case 0:
+		return "hello", nil
+	case 1:
+		return "world", nil
+	}
+}
+
+func (b ServiceB) ProcessingB() (int, error) {
+	// 何か複雑でややこしい処理
+	// 0 or 1、エラーが返ることもあるよ
+	return 0, nil
+}
+
+func main() {
+-   a := ServiceA{}
++	a := ServiceA{
++		b: ServiceB{},
++	}
+	a.ProcessingA()
+}
+```
+
+:::details 差分表示なし TODO
+```go
+func main() {
+	a := ServiceA{
+		b: ServiceB{},
+	}
+	a.ProcessingA()
+}
+```
+:::
+
+しかし、まだ不完全です。
+なぜなら、具象型(`struct`)への依存だからです。抽象型である`interface`に依存することで、
+
+```diff go
+type ServiceA struct {
+-   b ServiceB
++	b ServiceBInterface
+}
+
++type ServiceBInterface interface {
++	ProcessingB() (int, error)
++}
+
+type ServiceB struct{}
+
+func (a ServiceA) ProcessingA() (string, error) {
+	// ProcessingB の結果が影響
+	res, err := a.b.ProcessingB()
+	if err != nil {
+		return "", err
+	}
+	switch res {
+	case 0:
+		return "hello", nil
+	case 1:
+		return "world", nil
+	}
+}
+
+func (b ServiceB) ProcessingB() (int, error) {
+	// 何か複雑でややこしい処理
+	// 0 or 1、エラーが返ることもあるよ
+	return 0, nil
+}
+
+func main() {
+	a := ServiceA{
+		b: ServiceB{},
+	}
+	a.ProcessingA()
+}
+```
+
+```go
+type MockServiceB struct {
+	Result int
+	Err    error
+}
+
+func (m MockServiceB) ProcessingB() (int, error) {
+	return m.Result, m.Err
+}
+
+func TestServiceAProcessingAWithTableDriven(t *testing.T) {
+	testCases := []struct {
+		name     string
+		mock     MockServiceB
+		expected string
+		hasError bool
+	}{
+		{
+			name: "Success with 'hello'",
+			mock: MockServiceB{
+				Result: 0,
+				Err:    nil,
+			},
+			expected: "hello",
+			hasError: false,
+		},
+		{
+			name: "Success with 'world'",
+			mock: MockServiceB{
+				Result: 1,
+				Err:    nil,
+			},
+			expected: "world",
+			hasError: false,
+		},
+		{
+			name: "Error with empty result",
+			mock: MockServiceB{
+				Result: 1,
+				Err:    errors.New("Error in ProcessingB"),
+			},
+			expected: "",
+			hasError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// テストケースごとに ServiceA にモックを注入
+			serviceA := ServiceA{b: tc.mock}
+
+			result, err := serviceA.ProcessingA()
+
+			if result != tc.expected {
+				t.Errorf("Expected %s, but got %s", tc.expected, result)
+			}
+
+			if (err != nil) != tc.hasError {
+				t.Errorf("Expected error status: %v, but got: %v", tc.hasError, err)
+			}
+		})
+	}
+}
+```
+
+- 単体テストが困難
+- 拡張性の欠如
+
+ConsoleLogger の動作が Application のテスト結果に直接影響を与えるため、純粋な単体テストを行うのが難しくなります。
+テスト中に ConsoleLogger の振る舞いを制御することができないため、テストの再現性や精度が低下します。また、外部リソース（例えばコンソール出力）に依存するコードのテストは、モックやスタブを使用して内部依存関係を隔離する場合と比べて、一般的に複雑で時間がかかります。依存性注入を使用することで、これらの問題を回避し、より効率的で再現性の高いテストを実現できます。
 
 ## 概要
 
