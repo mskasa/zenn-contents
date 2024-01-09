@@ -6,6 +6,13 @@ topics: [go]
 published: false
 ---
 
+## 概要
+
+Go言語におけるインタフェースの活用方法について、実際のコードを交えながら解説します。
+
+想定読者は「Go言語のインタフェースについて勉強したものの、実際どういう時に使うの？」と疑問に感じている方々です。
+
+そのため、所謂「インタフェースとは」的な説明は省略させていただきます。
 
 
 ## インタフェースによる抽象化
@@ -52,16 +59,19 @@ func main() {
 ## インタフェースの抽象化によるメリット
 
 インタフェースが型の振る舞いを抽象化することは分かりましたが、一体これが何の役に立つのでしょうか。今回はインタフェースの抽象化による恩恵を2つ紹介しようと思います。
-1. ソースコードの共通化
-2. 具体的な実装との分離
+1. ソースコードの再利用性向上（共通化）
+2. ソースコードの拡張性向上
+3. 具体的な実装との分離
 
 先程の簡易的な例では、その恩恵を説明するのに限界があるため、より実用的な例を見てみましょう。
 普段我々がお世話になっている Goの標準ライブラリの中から `io.Reader` を例にしてみます。
 
-### ソースコードの共通化
+### ソースコードの再利用性向上（共通化）
 
 異なるデータソースからの読み取りを共通のインターフェースを通じて行うことで、コードの共通化が可能になります。
 インターフェースによる抽象化が、この共通化を可能にしています。
+
+### ソースコードの拡張性向上
 
 ### 具体的な実装との分離
 
@@ -268,14 +278,6 @@ func TestServiceAProcessingAWithTableDriven(t *testing.T) {
 ConsoleLogger の動作が Application のテスト結果に直接影響を与えるため、純粋な単体テストを行うのが難しくなります。
 テスト中に ConsoleLogger の振る舞いを制御することができないため、テストの再現性や精度が低下します。また、外部リソース（例えばコンソール出力）に依存するコードのテストは、モックやスタブを使用して内部依存関係を隔離する場合と比べて、一般的に複雑で時間がかかります。依存性注入を使用することで、これらの問題を回避し、より効率的で再現性の高いテストを実現できます。
 
-## 概要
-
-Go言語におけるインタフェースの活用方法について、実際のコードを交えながら解説します。
-
-想定読者は「Go言語のインタフェースについて勉強したものの、実際どういう時に使うの？」と疑問に感じている方々です。
-
-そのため、所謂「インタフェースとは」的な説明は省略させていただきます。
-
 ## インタフェースの特長（メリット）
 
 インタフェースの特長は、抽象化によるコードの拡張性と再利用性の向上です。
@@ -432,428 +434,6 @@ Go では、関数は第一級関数であるため、高階関数（関数が�
 
 https://zenn.dev/kasa/articles/golang-pacvim#%E9%AB%98%E9%9A%8E%E9%96%A2%E6%95%B0
 
-### 依存性の注入（DI）
-
-「依存性の注入（Dependency Injection）」という言葉は普及しているのでタイトルに使用しましたが、分かりにくいので、「インスタンス渡し」に置き換えてください。
-なぜか難しい用語で広まってしまっているため、ややこしく感じている人も多いですが、結局やっていることはオブジェクトAにオブジェクトBのインスタンスを外から渡しているだけです（下図参照）。
-
-このテクニックを使うとどんなメリットがあるのでしょうか。DIを利用していない場合と、利用した場合で比較してみましょう。
-
-オブジェクトが別のオブジェクトのインスタンスを直接作成するのではなく、その依存オブジェクトを外部から注入される（例：コンストラクタインジェクション、セッターインジェクション）。これにより、オブジェクトの作成と使用を分離し、柔軟性とテスタビリティを高めます。
-
-初期コード
-問題点説明
-DIコード
-テストコード
-インタフェースにして拡張
-
-```go
-type ServiceA struct{}
-
-type ServiceB struct{}
-
-func (a ServiceA) ProcessingA() (string, error) {
-	// A の中で Bインスタンスを生成
-	b := ServiceB{}
-	// ProcessingB の結果が影響
-	res, err := b.ProcessingB()
-	if err != nil {
-		return "", err
-	}
-	switch res {
-	case 0:
-		return "hello", nil
-	case 1:
-		return "world", nil
-	}
-}
-
-func (b ServiceB) ProcessingB() (int, error) {
-	// 何か複雑でややこしい処理
-	// 0 or 1、エラーが返ることもあるよ
-	return 0, nil
-}
-
-func main() {
-	a := ServiceA{}
-	a.ProcessingA()
-}
-```
-
-上記のコードは`ServiceA`の処理内で`ServiceB`を直接生成しています。
-そして、`ServiceB`の処理結果に応じて`ServiceA`の処理結果が変わります。
-
-つまり、`ServiceA`が`ServiceB`に依存しているわけです。
-その結果、`ServiceA`のテストをする際は`ServiceB`もテストすることとなるため、テストが失敗した際の問題の切り分けが難しくなります（単体テスト不可能な状態）。
-
-`ServiceB`が簡単な処理で、自チームで開発されているのであれば問題ないかもしれませんが、複雑な処理であったり、他チームが開発しているとなると、これは開発上の大きな問題になります。
-
-これを解決するのが DIです。
-
-まずは以下のように、外部からインスタンスを渡してあげましょう。
-依存性(`ServiceB`への依存)を外から注入しています。
-
-```diff go
--type ServiceA struct{}
-+type ServiceA struct {
-+	b ServiceB
-+}
-
-type ServiceB struct{}
-
-func (a ServiceA) ProcessingA() (string, error) {
--	// A の中で Bインスタンスを生成
--	b := ServiceB{}
-	// ProcessingB の結果が影響
--   res, err := b.ProcessingB()
-+	res, err := a.b.ProcessingB()
-	if err != nil {
-		return "", err
-	}
-	switch res {
-	case 0:
-		return "hello", nil
-	case 1:
-		return "world", nil
-	}
-}
-
-func (b ServiceB) ProcessingB() (int, error) {
-	// 何か複雑でややこしい処理
-	// 0 or 1、エラーが返ることもあるよ
-	return 0, nil
-}
-
-func main() {
--   a := ServiceA{}
-+	a := ServiceA{
-+		b: ServiceB{},
-+	}
-	a.ProcessingA()
-}
-```
-
-:::details 差分表示なし TODO
-```go
-func main() {
-	a := ServiceA{
-		b: ServiceB{},
-	}
-	a.ProcessingA()
-}
-```
-:::
-
-しかし、まだ不完全です。
-なぜなら、具象型(`struct`)への依存だからです。抽象型である`interface`に依存することで、
-
-```diff go
-type ServiceA struct {
--   b ServiceB
-+	b ServiceBInterface
-}
-
-+type ServiceBInterface interface {
-+	ProcessingB() (int, error)
-+}
-
-type ServiceB struct{}
-
-func (a ServiceA) ProcessingA() (string, error) {
-	// ProcessingB の結果が影響
-	res, err := a.b.ProcessingB()
-	if err != nil {
-		return "", err
-	}
-	switch res {
-	case 0:
-		return "hello", nil
-	case 1:
-		return "world", nil
-	}
-}
-
-func (b ServiceB) ProcessingB() (int, error) {
-	// 何か複雑でややこしい処理
-	// 0 or 1、エラーが返ることもあるよ
-	return 0, nil
-}
-
-func main() {
-	a := ServiceA{
-		b: ServiceB{},
-	}
-	a.ProcessingA()
-}
-```
-
-```go
-type MockServiceB struct {
-	Result int
-	Err    error
-}
-
-func (m MockServiceB) ProcessingB() (int, error) {
-	return m.Result, m.Err
-}
-
-func TestServiceAProcessingAWithTableDriven(t *testing.T) {
-	testCases := []struct {
-		name     string
-		mock     MockServiceB
-		expected string
-		hasError bool
-	}{
-		{
-			name: "Success with 'hello'",
-			mock: MockServiceB{
-				Result: 0,
-				Err:    nil,
-			},
-			expected: "hello",
-			hasError: false,
-		},
-		{
-			name: "Success with 'world'",
-			mock: MockServiceB{
-				Result: 1,
-				Err:    nil,
-			},
-			expected: "world",
-			hasError: false,
-		},
-		{
-			name: "Error with empty result",
-			mock: MockServiceB{
-				Result: 1,
-				Err:    errors.New("Error in ProcessingB"),
-			},
-			expected: "",
-			hasError: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// テストケースごとに ServiceA にモックを注入
-			serviceA := ServiceA{b: tc.mock}
-
-			result, err := serviceA.ProcessingA()
-
-			if result != tc.expected {
-				t.Errorf("Expected %s, but got %s", tc.expected, result)
-			}
-
-			if (err != nil) != tc.hasError {
-				t.Errorf("Expected error status: %v, but got: %v", tc.hasError, err)
-			}
-		})
-	}
-}
-```
-
-- 単体テストが困難
-- 拡張性の欠如
-
-ConsoleLogger の動作が Application のテスト結果に直接影響を与えるため、純粋な単体テストを行うのが難しくなります。
-テスト中に ConsoleLogger の振る舞いを制御することができないため、テストの再現性や精度が低下します。また、外部リソース（例えばコンソール出力）に依存するコードのテストは、モックやスタブを使用して内部依存関係を隔離する場合と比べて、一般的に複雑で時間がかかります。依存性注入を使用することで、これらの問題を回避し、より効率的で再現性の高いテストを実現できます。
-
-```go
-type Application struct{}
-
-type ConsoleLogger struct{}
-
-func (l ConsoleLogger) Log(message string) {
-	fmt.Println("Log to console:", message)
-}
-
-func (app *Application) Run() {
-	logger := ConsoleLogger{}
-	logger.Log("Application is running")
-}
-
-func main() {
-	app := Application{}
-	app.Run()
-}
-```
-
-- 単体テストが困難
-- 拡張性の欠如
-
-ConsoleLogger の動作が Application のテスト結果に直接影響を与えるため、純粋な単体テストを行うのが難しくなります。
-テスト中に ConsoleLogger の振る舞いを制御することができないため、テストの再現性や精度が低下します。また、外部リソース（例えばコンソール出力）に依存するコードのテストは、モックやスタブを使用して内部依存関係を隔離する場合と比べて、一般的に複雑で時間がかかります。依存性注入を使用することで、これらの問題を回避し、より効率的で再現性の高いテストを実現できます。
-
-```go
-type Application struct {
-	logger ConsoleLogger
-}
-
-type ConsoleLogger struct{}
-
-func (l ConsoleLogger) Log(message string) {
-	fmt.Println("Log to console:", message)
-}
-
-func (app *Application) Run() {
-	app.logger.Log("Application is running")
-}
-
-func main() {
-	app := Application{
-		logger: ConsoleLogger{},
-	}
-	app.Run()
-}
-```
-
-上記のコードの問題点は Application が直接 ConsoleLogger に依存していることです。
-
-```go
-type Application struct {
-	logger ConsoleLogger // 直接 ConsoleLogger に依存
-}
-```
-
-これにより、以下の問題が発生します。
-
-1. 単体テストが困難
-2. 拡張性の欠如
-
-特に 1つ目の問題は重大でしょう。この例ですと、ConsoleLogger の動作が Application のテスト結果に直接影響を与えるため、純粋な単体テストを行うのが非常に困難です。
-
-```go
-type Application struct {
-	logger ConsoleLogger
-}
-
-type ConsoleLogger struct{}
-
-func (l ConsoleLogger) Log(message string) {
-	fmt.Println("Log to console:", message)
-}
-
-func (app *Application) Run() {
-	app.logger.Log("Application is running")
-}
-
-func (app *Application) SetLogger(logger ConsoleLogger) {
-	app.logger = logger
-}
-
-func main() {
-	app := &Application{}
-
-	consoleLogger := ConsoleLogger{}
-	app.SetLogger(consoleLogger)
-
-	app.Run()
-}
-```
-
-- 単体テストが困難
-- 拡張性の欠如
-
-ConsoleLogger の動作が Application のテスト結果に直接影響を与えるため、純粋な単体テストを行うのが難しくなります。
-テスト中に ConsoleLogger の振る舞いを制御することができないため、テストの再現性や精度が低下します。また、外部リソース（例えばコンソール出力）に依存するコードのテストは、モックやスタブを使用して内部依存関係を隔離する場合と比べて、一般的に複雑で時間がかかります。依存性注入を使用することで、これらの問題を回避し、より効率的で再現性の高いテストを実現できます。
-
-```go
-type Logger interface {
-	Log(message string)
-}
-
-type Application struct {
-	logger Logger
-}
-
-type ConsoleLogger struct{}
-
-func (l ConsoleLogger) Log(message string) {
-	fmt.Println("Log to console:", message)
-}
-
-func (app *Application) Run() {
-	app.logger.Log("Application is running")
-}
-
-func main() {
-	app := Application{
-		logger: ConsoleLogger{},
-	}
-	app.Run()
-}
-```
-
-```go
-type MockLogger struct {
-	LoggedMessages []string
-}
-
-func (l *MockLogger) Log(message string) {
-	l.LoggedMessages = append(l.LoggedMessages, message)
-}
-
-func TestApplicationRun(t *testing.T) {
-	mockLogger := &MockLogger{}
-	app := &Application{
-		logger: mockLogger,
-	}
-
-	app.Run()
-
-	if len(mockLogger.LoggedMessages) != 1 || mockLogger.LoggedMessages[0] != "Application is running" {
-		t.Errorf("Expected 'Application is running' log message, got %v", mockLogger.LoggedMessages)
-	}
-}
-```
-
-インタフェースに依存している場合、そのインタフェースのIN/OUT（つまり、メソッドのシグネチャや振る舞いの契約）が変わらない限り、依存している側のコードの振る舞いは変わらないというメリットがあります。これにより、インタフェースの実装を変更しても、インタフェースを使用するコードには影響が及びません。
-
-一方で、インタフェースのIN/OUT自体が変更される場合、それは依存しているコードに大きな影響を与える可能性があります。このため、インタフェースの変更は慎重に行う必要があり、通常は互換性を保つために既存のインタフェースを維持しながら新しいインタフェースを追加する形を取ることが一般的です。
-
-```go
-// 既存のインタフェース
-type Logger interface {
-    Log(message string)
-}
-
-// 新しい機能を追加した拡張インタフェース
-type AdvancedLogger interface {
-    Logger // 既存のインタフェースを組み込む
-    LogWithLevel(message string, level LogLevel)
-}
-
-// 既存のインタフェースを実装する型
-type SimpleLogger struct{}
-
-func (l SimpleLogger) Log(message string) {
-    fmt.Println(message)
-}
-
-// 拡張インタフェースを実装する型
-type LevelLogger struct{}
-
-func (l LevelLogger) Log(message string) {
-    // 基本的なログ記録の実装
-    fmt.Println(message)
-}
-
-func (l LevelLogger) LogWithLevel(message string, level LogLevel) {
-    // レベルを含むログ記録の実装
-    fmt.Printf("[%s] %s\n", level, message)
-}
-
-// 使用例
-func performLogging(l Logger) {
-    l.Log("Basic log message")
-    if advLogger, ok := l.(AdvancedLogger); ok {
-        advLogger.LogWithLevel("Advanced log message", Info)
-    }
-}
-```
-
-DIを使用すると、コンポーネントは抽象型（インターフェースや抽象クラス）に依存することが一般的です。これは、LSPの原則とも一致し、多様な実装が同じインターフェースを共有することを促進します。
-
 ## インタフェースの使いどころ
 
 これまでインタフェースのメリットのみを解説してきましたが、デメリットもあります。
@@ -900,3 +480,16 @@ Go言語において関数をインターフェース型の引数で呼び出す
 インターフェース型の引数を関数に渡す場合、コンパイラはそのインターフェースが関数の外部でどのように使用されるかを判断する必要があります。インターフェースを介して渡されるオブジェクトがエスケープすると判断されると、そのオブジェクトはヒープに割り当てられます。
 
 ヒープとスタック: Go言語のコンパイラは、変数の割り当て場所（ヒープまたはスタック）を実行時の挙動に基づいて決定します。一般的に、関数のスコープを超えて生存する可能性がある変数はヒープに配置され、スコープ内で完結する変数はスタックに配置されます。
+
+## まとめ
+
+- インタフェースの役割は抽象化である
+  - 抽象化によるメリットは以下の通りである
+    1. ソースコードの再利用性向上（共通化）
+    2. ソースコードの拡張性向上
+    3. 具体的な実装との分離
+- Go言語では「インタフェースは発見するもの」という設計思想がある
+  - この思想が、インタフェースの暗黙的実装に取り入れられている
+  - インタフェースを中心に設計するのではなく、開発過程で発見し、必要に応じて適用する
+    - インタフェース汚染を防ぎ、ソースコードの複雑化を抑止できる
+
