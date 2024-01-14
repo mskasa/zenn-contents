@@ -71,14 +71,184 @@ func main() {
 2. ソースコードの拡張性向上
 3. 具体的な実装との分離
 
-普段我々がお世話になっている Goの標準ライブラリの中から `io.Reader` を例にしてみます。
-
 ### ソースコードの再利用性向上（共通化）
+
+まずは以下のサンプルコードを見てください。
+
+```go
+func BufferToUpper(buf *bytes.Buffer) {
+	data := make([]byte, buf.Len())
+	len, _ := buf.Read(data)
+	str := string(data[:len])
+
+	result := strings.ToUpper(str)
+	fmt.Println(result)
+}
+
+func StringToUpper(s *strings.Reader) {
+	data := make([]byte, 300)
+	len, _ := s.Read(data)
+	str := string(data[:len])
+
+	result := strings.ToUpper(str)
+	fmt.Println(result)
+}
+
+func FileToUpper(f *os.File) {
+	data := make([]byte, 300)
+	len, _ := f.Read(data)
+	str := string(data[:len])
+
+	result := strings.ToUpper(str)
+	fmt.Println(result)
+}
+
+func main() {
+	// バッファからの読み取り
+	var buf bytes.Buffer
+	buf.WriteString("This is data from bytes.Buffer.")
+	BufferToUpper(&buf)
+
+	// 文字列リーダーからの読み取り
+	strReader := strings.NewReader("This is a sample string.")
+	StringToUpper(strReader)
+
+	// ファイルからの読み込み
+	file, err := os.Open("example.txt")
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+	}
+	defer file.Close()
+
+	FileToUpper(file)
+}
+```
+
+`BufferToUpper()`、`StringToUpper()`、`FileToUpper()`は、いずれも引数として受け取った値を大文字に変換する関数です。実装をよく見ると、引数が異なるだけで、処理内容はほとんど同じです。
+
+なぜこのようなことになってしまうかというと、それぞれ具体的なデータソース（バッファ、文字列リーダー、ファイル）を扱う関数として実装しているからです。
+ここでインタフェースの抽象化が活きてくるわけです。
+
+`io.Reader`は Go言語の標準ライブラリに定義されているインターフェースで、この例にあるすべての型（`bytes.Buffer`、`strings.Reader`、`os.File`）は`io.Reader`インタフェースを実装しています。
+
+よって、以下のように1つの関数に共通化できます。
+
+```go
+func ToUpper(r io.Reader) {
+	data := make([]byte, 300)
+	len, _ := r.Read(data)
+	str := string(data[:len])
+
+	result := strings.ToUpper(str)
+	fmt.Println(result)
+}
+
+func main() {
+	// バッファからの読み取り
+	var buf bytes.Buffer
+	buf.WriteString("This is data from bytes.Buffer.")
+	ToUpper(&buf)
+
+	// 文字列リーダーからの読み取り
+	strReader := strings.NewReader("This is a sample string.")
+	ToUpper(strReader)
+
+	// ファイルからの読み込み
+	file, err := os.Open("example.txt")
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+	}
+	defer file.Close()
+
+	ToUpper(file)
+}
+```
+
+結果的に、関数`ToUpper()`が複数回呼び出されるようになります。
+ソースコードの共通化、これ即ちソースコードの再利用性向上というわけです。
+
 
 異なるデータソースからの読み取りを共通のインターフェースを通じて行うことで、コードの共通化が可能になります。
 インターフェースによる抽象化が、この共通化を可能にしています。
 
+利用者は様々な入力ソースに対して同じコードを再利用できるようになります。
+
+新しいデータソースタイプごとに新しい関数を作成する必要があります。
+
 ### ソースコードの拡張性向上
+
+ここでは、Go言語のビルトインの`error`インタフェースを例に、ソースコードの拡張性を見ていきます。
+
+`error`インタフェースは以下の様に非常にシンプルな定義です。
+
+```go
+type error interface {
+	Error() string
+}
+```
+
+例として、前章のサンプルコードにあった、`os.Open()`で`no such file or directory`のエラーが発生した場合を紐解いてみます。
+
+```go
+file, err := os.Open("example.txt")
+if err != nil {
+	errType := reflect.TypeOf(err)
+	fmt.Println("Error opening file:", err)
+}
+```
+
+reflectパッケージの`TypeOf()`関数で `err`の型も表示してみると、`fs`パッケージの`PathError`型が返ってきているようです。
+
+```
+Error type: *fs.PathError
+Error opening file: open example.txt: no such file or directory
+```
+
+ソースコードを辿っていくと、以下の実装に辿り着きました。
+型`PathError`が errorインタフェースを実装していることが分かりますね。
+
+```go
+type PathError struct {
+	Op   string
+	Path string
+	Err  error
+}
+
+func (e *PathError) Error() string { return e.Op + " " + e.Path + ": " + e.Err.Error() }
+```
+https://github.com/golang/go/blob/master/src/io/fs/fs.go#L244-L250
+
+そして、`fmt.Println("Error opening file:", err)`の部分で fmtパッケージに errorインタフェースの実装を渡すことで、内部的に`err.Error()`が実行され、エラーメッセージが表示されるという仕組みです。
+
+以上が、fsパッケージ上で独自に定義されている `PathError`型
+
+この例が示すことは、誰でも簡単に独自のエラー型を定義できますよということです。
+これ即ちソースコードの拡張性向上というわけです。
+
+```go
+type MyError struct {
+	Code    int
+	Message string
+}
+
+func (e *MyError) Error() string {
+	return fmt.Sprintf("error: code=%d, message=%s", e.Code, e.Message)
+}
+
+func doSomething() error {
+	return &MyError{
+		Message: "An error occurred",
+		Code:    1,
+	}
+}
+
+func main() {
+	err := doSomething()
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+```
 
 ### 具体的な実装との分離
 
