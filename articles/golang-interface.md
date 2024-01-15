@@ -11,9 +11,9 @@ published: false
 **本記事の流れは以下の通りです。**
 1. インタフェースによる抽象化について、簡単な例で解説します
 2. インタフェースのメリットについて、以下3つの観点から解説します
-   - ソースコードの共通化により、再利用性が向上する
-   - ソースコードの拡張性が向上する
-   - ソースコードのテスタビリティが向上する
+   - ソースコードの再利用性
+   - ソースコードの拡張性
+   - ソースコードのテスタビリティ
 3. インタフェースの使いどころについて解説します
 
 **本記事の想定読者は以下の通りです。**
@@ -23,7 +23,8 @@ published: false
 
 ## インタフェースによる抽象化
 
-インタフェースの役割は抽象化にあり、その抽象化が様々なメリットをもたらします。
+インタフェースの役割は抽象化です。この抽象化が様々なメリットをもたらします。
+
 まずは以下のサンプルコードを見てください。
 
 ```go
@@ -47,18 +48,23 @@ func (r Rectangle) Area() float64 {
 ```
 
 この例では、異なる型である`Circle`と`Rectangle`が同じインタフェース`Shape`を通して、同一のシグネチャ`Area() float64`で異なる動作をします。
-「面積を計算する」ことを、「`Area`というメソッド名で、`float64`の値を返すこと」に抽象化しているわけですね。これで、図形の種類に関わらず、同じ方法（シグネチャ）で、型を操作できるようになりました。
-しかし、このような簡易的な例ですと、あまりそのメリットが伝わりません。次章では、より実践的な例で、インタフェースの抽象化によるメリットを見ていきましょう。
+
+「面積を計算すること」を「`Area`というメソッド名で、`float64`の値を返すこと」に抽象化しているわけですね。これで、図形の種類に関わらず、同じ方法（シグネチャ）で、型を操作できるようになりました。
+
+しかし、このような簡易的な例ですと、あまりそのメリットが伝わりません。
+
+次章では、より実践的な例で、インタフェースの抽象化によるメリットを見ていきましょう。
 
 ## インタフェースのメリット
 
 前章では、インタフェースが型の振る舞いを抽象化することについて解説しました。
-本章では、以下3つの観点からインタフェースの抽象化によるメリットを解説します。
-1. ソースコードの再利用性向上（共通化）
-2. ソースコードの拡張性向上
-3. 具体的な実装との分離
 
-### ソースコードの再利用性向上（共通化）
+本章では、以下3つの観点からインタフェースの抽象化によるメリットを解説します。
+- ソースコードの再利用性
+- ソースコードの拡張性
+- ソースコードのテスタビリティ
+
+### ソースコードの再利用性の向上（共通化）
 
 まずは以下のサンプルコードを見てください。
 
@@ -111,11 +117,66 @@ func main() {
 }
 ```
 
-`BufferToUpper()`、`StringToUpper()`、`FileToUpper()`は、いずれも引数として受け取った値を大文字に変換する関数です。実装をよく見ると、引数が異なるだけで、処理内容はほとんど同じです。
+`BufferToUpper()`、`StringToUpper()`、`FileToUpper()`は、いずれも引数として受け取った値を大文字に変換する関数です。実装をよく見ると、引数が異なるだけで、処理内容はほとんど同じなので、できれば共通化したいです。
 
-それぞれが具体的なデータソース（バッファ、文字列、ファイル）を読み込む関数として実装されているため、冗長に書く必要がでてきます。つまり、「読み込むこと」を抽象化したインタフェース`io.Reader`を利用すれば、この冗長性を解消できそうです。
+現状、それぞれが具体的なデータソース（バッファ、文字列、ファイル）を読み込む関数として実装されているので、「読み込むこと」を抽象化したインタフェース`io.Reader`を利用すれば共通化できそうです。
 
-`io.Reader`は、Go言語標準の ioパッケージの Readerインタフェースで、この例にあるすべての型（`bytes.Buffer`、`strings.Reader`、`os.File`）は`io.Reader`を実装しています。
+`io.Reader`は、Go言語標準の `io`パッケージに定義されているインタフェースで、この例にあるすべての型（`bytes.Buffer`、`strings.Reader`、`os.File`）は`io.Reader`を実装しています。
+
+:::details 詳細
+```go
+type Reader interface {
+	Read(p []byte) (n int, err error)
+}
+```
+出典:https://github.com/golang/go/blob/master/src/io/io.go
+
+```go
+func (b *Buffer) Read(p []byte) (n int, err error) {
+	b.lastRead = opInvalid
+	if b.empty() {
+		// Buffer is empty, reset to recover space.
+		b.Reset()
+		if len(p) == 0 {
+			return 0, nil
+		}
+		return 0, io.EOF
+	}
+	n = copy(p, b.buf[b.off:])
+	b.off += n
+	if n > 0 {
+		b.lastRead = opRead
+	}
+	return n, nil
+}
+```
+出典：https://github.com/golang/go/blob/master/src/bytes/buffer.go
+
+```go
+func (r *Reader) Read(b []byte) (n int, err error) {
+	if r.i >= int64(len(r.s)) {
+		return 0, io.EOF
+	}
+	r.prevRune = -1
+	n = copy(b, r.s[r.i:])
+	r.i += int64(n)
+	return
+}
+```
+出典：https://github.com/golang/go/blob/master/src/strings/reader.go
+
+```go
+func (f *File) Read(b []byte) (n int, err error) {
+	if err := f.checkValid("read"); err != nil {
+		return 0, err
+	}
+	n, e := f.read(b)
+	return n, f.wrapErr("read", e)
+}
+```
+出典：https://github.com/golang/go/blob/master/src/os/file.go
+:::
+
 
 よって、以下のように1つの関数に共通化できます。
 
@@ -153,13 +214,13 @@ func main() {
 結果的に、関数`ToUpper()`が複数回呼び出されるようになります。
 ソースコードの共通化、これ即ちソースコードの再利用性向上というわけです。
 
-以上が、インタフェースの抽象化によるソースコード共通化の例です。
+以上が、インタフェースのメリットの1つであるソースコードの共通化で、これがソースコードの再利用性向上に寄与しています。
 
-### ソースコードの拡張性向上
+### ソースコードの拡張性の向上
 
-本章では、Go言語のビルトインの`error`インタフェースを例に、ソースコードの拡張性向上について見ていきます。
+本章では、Go言語のビルトインの`error`インタフェースを例に、ソースコードの拡張性について見ていきます。
 
-`error`インタフェースは以下の様に非常にシンプルな定義です。唯一のメソッドはError()で、これはエラーメッセージを文字列で返すだけです。このシンプルさが拡張性を高める一因となっています。
+`error`インタフェースは以下の様に非常にシンプルな定義です。唯一のメソッドは`Error()`で、これはエラーメッセージを文字列で返すだけです。このシンプルさが拡張性を高める一因となっています。
 
 ```go
 type error interface {
@@ -177,15 +238,15 @@ if err != nil {
 }
 ```
 
-reflectパッケージの`TypeOf()`で `err`の型を表示してみると、`fs`パッケージの`PathError`型が返ってきているようです。
+`err`の型が知りたいため、reflectパッケージの`TypeOf()`処理を追加しています。
+結果、`fs`パッケージの`PathError`型が返ってきているようです。
 
 ```
 Error type: *fs.PathError
 Error opening file: open example.txt: no such file or directory
 ```
 
-ソースコードを辿っていくと、以下の実装に辿り着きました（https://github.com/golang/go/blob/master/src/io/fs/fs.go#L244-L250）。
-`PathError`型が errorインタフェースを実装していることが分かりますね。
+ソースコードを辿っていくと、以下の実装に辿り着きました。`PathError`型が `error`インタフェースを実装していることが分かりますね。
 
 ```go
 type PathError struct {
@@ -196,8 +257,7 @@ type PathError struct {
 
 func (e *PathError) Error() string { return e.Op + " " + e.Path + ": " + e.Err.Error() }
 ```
-
-そして、`fmt.Println("Error opening file:", err)`の部分で fmtパッケージに errorインタフェースの実装を渡すことで、内部的に`err.Error()`が実行され、エラーメッセージが表示されるという仕組みです。
+出典：https://github.com/golang/go/blob/master/src/io/fs/fs.go#L244-L250
 
 この例が示すことは、誰でも簡単に独自のカスタムエラーを作成できるということです。例えば、`MyError`型を定義する場合は以下の様になります。
 
@@ -226,11 +286,17 @@ func main() {
 }
 ```
 
-このように、独自のエラー型を定義し、`Error()`メソッドを実装することで、特定の情報や振る舞いを持つ新しいカスタムエラーを簡単に作成できます。インタフェースがソースコードの拡張性に寄与していることが分かります。
+:::message
+補足：`Error()`はどのタイミングで実行される？
+fmtパッケージに errorインタフェースの実装を渡すことで、内部的に`err.Error()`が実行されます。上のコードでは`fmt.Println(err)`の部分です。
+:::
+
+このように、独自のエラー型を定義し、`Error()`メソッドを実装することで、特定の情報や振る舞いを持つ新しいカスタムエラーを簡単に作成できます。以上のことから、インタフェースがソースコードの拡張性に寄与していることが分かります。
 
 ### ソースコードのテスタビリティ向上
 
 インタフェースを利用することで、コンポーネント間を疎結合にすることができます。
+
 まずは以下のサンプルコードを見てください。
 
 ```go
@@ -239,7 +305,7 @@ type ServiceA struct{}
 type ServiceB struct{}
 
 func (a ServiceA) ProcessingA() (string, error) {
-	// 型「ServiceB」を実装
+	// ServiceB型を実装
 	b := ServiceB{}
 
 	res, err := b.ProcessingB()
@@ -267,17 +333,17 @@ func main() {
 }
 ```
 
-上記のコードでは、`ServiceA`型の`ProcessingA()`内で、`ServiceB`型を実装しています。
-そして、`ServiceB`型の`ProcessingB()`の処理結果に応じて`ProcessingA()`の処理結果が変わります。
+上のコードでは、`ServiceA`型の`ProcessingA()`内で、`ServiceB`型を実装しています。そして、`ServiceB`型の`ProcessingB()`の処理結果に応じて`ProcessingA()`の処理結果が変わります。
+
 つまり、`ServiceA`型が`ServiceB`型に依存しており、`ProcessingA()`の単体テストが不可能な状態であるといえます。
 
-`ProcessingB()`が簡単な処理で、自チームで開発されているのであれば問題ないかもしれません。
-しかし、複雑な処理であったり、他チームが開発しているとなると、これは開発上の大きな問題になります。
+`ProcessingB()`が簡単な処理で、自チームで開発されているのであれば問題ないかもしれません。しかし、複雑な処理であったり、他チームが開発しているとなると、開発上の大きな問題になってしまいます。
 
-これを解決するのが、オブジェクト指向言語でいうところの依存性の注入（Dependency Injection, DI）になります。
-DIは難しくとらわれがちですが、ただ単に外部からインスタンスを渡してあげることに他なりません。
-Go はオブジェクト指向言語ではないため、オブジェクトやインスタンスという概念がありません。
-そのため「型」や「型の実装」という表現をここでは使用しますが、オブジェクト指向言語に慣れている方は「型」を「オブジェクト」、「型の実装」を「インスタンス」と読み替えていただくと咀嚼しやすいと思います。
+これを解決するのが、オブジェクト指向言語でいうところの依存性の注入（Dependency Injection, DI）になります。DIは難しくとらわれがちですが、ただ単に外部からインスタンスを渡してあげることに他なりません。
+
+:::message
+Go言語はオブジェクト指向言語ではないため、オブジェクトやインスタンスという概念がありません。そのため「型」や「型の実装」という表現をここでは使用しますが、オブジェクト指向言語に慣れている方は「型」を「オブジェクト」、「型の実装」を「インスタンス」と読み替えていただくと咀嚼しやすいと思います。
+:::
 
 では、依存性(`ServiceB`型への依存)を外部から注入するように変更してみます。
 
@@ -290,7 +356,7 @@ Go はオブジェクト指向言語ではないため、オブジェクトや�
 type ServiceB struct{}
 
 func (a ServiceA) ProcessingA() (string, error) {
--	// A の中で Bインスタンスを生成
+-	// ServiceB型を実装
 -	b := ServiceB{}
 -	res, err := b.ProcessingB()
 +	res, err := a.b.ProcessingB()
@@ -314,19 +380,19 @@ func (b ServiceB) ProcessingB() (int, error) {
 func main() {
 -	a := ServiceA{}
 +	a := ServiceA{
-+		b: ServiceB{},	// 型「ServiceB」の実装を注入
++		b: ServiceB{},	// ServiceB型の実装を注入
 +	}
 	a.ProcessingA()
 }
 ```
 
-`ServiceB`型の実装を外部から渡すように変更できました。
-しかし、具象型（構造体）である`ServiceB`に依存していることに変わりはありません。
-抽象型（インタフェース）である`ServiceBInterface`を定義し、そのインタフェースに依存するように変更します。
+`ServiceB`型の実装を外部から渡すように変更しました。
+
+しかし、具象型（構造体）である`ServiceB`に依存していることに変わりはありません。抽象型（インタフェース）である`ServiceBInterface`を定義し、そのインタフェースに依存するように変更します。
 
 ```diff go
 type ServiceA struct {
--   b ServiceB
+-	b ServiceB
 +	b ServiceBInterface
 }
 
