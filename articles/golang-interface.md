@@ -348,42 +348,42 @@ Go言語はオブジェクト指向言語ではないため、オブジェクト
 では、依存性(`ServiceB`型への依存)を外部から注入するように変更してみます。
 
 ```diff go
-- type ServiceA struct{}
-+ type ServiceA struct {
-+ 	b ServiceB
-+ }
+-type ServiceA struct{}
++type ServiceA struct {
++	b ServiceB
++}
 
-type ServiceB struct{}
+ type ServiceB struct{}
 
-func (a ServiceA) ProcessingA() (string, error) {
+ func (a ServiceA) ProcessingA() (string, error) {
 -	// ServiceB型を実装
 -	b := ServiceB{}
 -	res, err := b.ProcessingB()
 +	res, err := a.b.ProcessingB()
-	if err != nil {
-		return "", err
-	}
-	switch res {
-	case 0:
-		return "hello", nil
-	case 1:
-		return "world", nil
-	}
-}
+ 	if err != nil {
+ 		return "", err
+ 	}
+ 	switch res {
+ 	case 0:
+ 		return "hello", nil
+ 	case 1:
+ 		return "world", nil
+ 	}
+ }
 
-func (b ServiceB) ProcessingB() (int, error) {
-	// 何か複雑でややこしい処理
-	// 0 or 1、エラーが返ることもあるよ
-	return 0, nil
-}
+ func (b ServiceB) ProcessingB() (int, error) {
+ 	// 何か複雑でややこしい処理
+ 	// 0 or 1、エラーが返ることもあるよ
+ 	return 0, nil
+ }
 
-func main() {
+ func main() {
 -	a := ServiceA{}
 +	a := ServiceA{
 +		b: ServiceB{},	// ServiceB型の実装を注入
 +	}
-	a.ProcessingA()
-}
+ 	a.ProcessingA()
+ }
 ```
 
 `ServiceB`型の実装を外部から渡すように変更しました。
@@ -391,43 +391,14 @@ func main() {
 しかし、具象型（構造体）である`ServiceB`に依存していることに変わりはありません。抽象型（インタフェース）である`ServiceBInterface`を定義し、そのインタフェースに依存するように変更します。
 
 ```diff go
-type ServiceA struct {
+ type ServiceA struct {
 -	b ServiceB
 +	b ServiceBInterface
-}
+ }
 
 +type ServiceBInterface interface {
 +	ProcessingB() (int, error)
 +}
-
-type ServiceB struct{}
-
-func (a ServiceA) ProcessingA() (string, error) {
-	// ProcessingB の結果が影響
-	res, err := a.b.ProcessingB()
-	if err != nil {
-		return "", err
-	}
-	switch res {
-	case 0:
-		return "hello", nil
-	case 1:
-		return "world", nil
-	}
-}
-
-func (b ServiceB) ProcessingB() (int, error) {
-	// 何か複雑でややこしい処理
-	// 0 or 1、エラーが返ることもあるよ
-	return 0, nil
-}
-
-func main() {
-	a := ServiceA{
-		b: ServiceB{},
-	}
-	a.ProcessingA()
-}
 ```
 
 これで、具体的な実装から分離することができました。以下の様に`ProcessingB()`のモックを作成することで、`ProcessingA()`の単体テストを記述することができます。
@@ -520,3 +491,5 @@ Go言語におけるインタフェースの最大の特徴は、インタフェ
   - Go言語のインタフェースは暗黙的に実装されるため、後からインタフェースを追加するのが比較的容易である
 
 ## 参考
+
+https://book.impress.co.jp/books/1122101133
