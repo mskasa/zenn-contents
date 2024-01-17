@@ -230,12 +230,13 @@ type error interface {
 
 例として、前章のサンプルコードにあった、`os.Open()`で`no such file or directory`のエラーが発生した場合を紐解いてみます。
 
-```go
-file, err := os.Open("example.txt")
-if err != nil {
-	errType := reflect.TypeOf(err)
-	fmt.Println("Error opening file:", err)
-}
+```go diff
+ file, err := os.Open("example.txt")
+ if err != nil {
++	errType := reflect.TypeOf(err)
++	fmt.Println("Error type:", errType)
+ 	fmt.Println("Error opening file:", err)
+ }
 ```
 
 `err`の型が知りたいため、reflectパッケージの`TypeOf()`処理を追加しています。
@@ -304,32 +305,27 @@ type ServiceA struct{}
 
 type ServiceB struct{}
 
-func (a ServiceA) ProcessingA() (string, error) {
+func (a ServiceA) ProcessingA() string {
 	// ServiceB型を実装
 	b := ServiceB{}
-
-	res, err := b.ProcessingB()
-	if err != nil {
-		return "", err
-	}
-
-	switch res {
-	case 0:
-		return "hello", nil
-	case 1:
-		return "world", nil
+	res := b.ProcessingB()
+	// ProcessingB の処理結果如何で、なんやかんや
+	if res == 0 {
+		return "hello"
+	} else {
+		return "world"
 	}
 }
 
-func (b ServiceB) ProcessingB() (int, error) {
-	// 何か複雑でややこしい処理
-	// 0 or 1、エラーが返ることもあるよ
-	return 0, nil
+func (b ServiceB) ProcessingB() int {
+	// なんやかんや
+	return 0
 }
 
 func main() {
 	a := ServiceA{}
-	a.ProcessingA()
+	result := a.ProcessingA()
+	fmt.Println(result)
 }
 ```
 
@@ -355,26 +351,22 @@ Go言語はオブジェクト指向言語ではないため、オブジェクト
 
  type ServiceB struct{}
 
- func (a ServiceA) ProcessingA() (string, error) {
+ func (a ServiceA) ProcessingA() string {
 -	// ServiceB型を実装
 -	b := ServiceB{}
--	res, err := b.ProcessingB()
-+	res, err := a.b.ProcessingB()
- 	if err != nil {
- 		return "", err
- 	}
- 	switch res {
- 	case 0:
- 		return "hello", nil
- 	case 1:
- 		return "world", nil
+-	res := b.ProcessingB()
++	res := a.b.ProcessingB()
+ 	// ProcessingB の処理結果如何で、なんやかんや
+ 	if res == 0 {
+ 		return "hello"
+ 	} else {
+ 		return "world"
  	}
  }
 
- func (b ServiceB) ProcessingB() (int, error) {
- 	// 何か複雑でややこしい処理
- 	// 0 or 1、エラーが返ることもあるよ
- 	return 0, nil
+ func (b ServiceB) ProcessingB() int {
+ 	// なんやかんや
+ 	return 0
  }
 
  func main() {
@@ -382,7 +374,8 @@ Go言語はオブジェクト指向言語ではないため、オブジェクト
 +	a := ServiceA{
 +		b: ServiceB{},	// ServiceB型の実装を注入
 +	}
- 	a.ProcessingA()
+ 	result := a.ProcessingA()
+ 	fmt.Println(result)
  }
 ```
 
@@ -397,70 +390,81 @@ Go言語はオブジェクト指向言語ではないため、オブジェクト
  }
 
 +type ServiceBInterface interface {
-+	ProcessingB() (int, error)
++	ProcessingB() int
 +}
 ```
+
+:::details コード全体
+```go
+type ServiceA struct {
+	b ServiceBInterface
+}
+
+type ServiceB struct{}
+
+type ServiceBInterface interface {
+	ProcessingB() int
+}
+
+func (a ServiceA) ProcessingA() string {
+	res := a.b.ProcessingB()
+	// ProcessingB の処理結果如何で、なんやかんや
+	if res == 0 {
+		return "hello"
+	} else {
+		return "world"
+	}
+}
+
+func (b ServiceB) ProcessingB() int {
+	// なんやかんや
+	return 0
+}
+
+func main() {
+	a := ServiceA{
+		b: ServiceB{}, // ServiceB型の実装を注入
+	}
+	result := a.ProcessingA()
+	fmt.Println(result)
+}
+```
+:::
 
 これで、具体的な実装から分離することができました。以下の様に`ProcessingB()`のモックを作成することで、`ProcessingA()`の単体テストを記述することができます。
 
 ```go
 type MockServiceB struct {
-	Result int
-	Err    error
+	ProcessingBFunc func() int
 }
 
-func (m MockServiceB) ProcessingB() (int, error) {
-	return m.Result, m.Err
+func (m *MockServiceB) ProcessingB() int {
+	return m.ProcessingBFunc()
 }
 
 func TestProcessingA(t *testing.T) {
-	testCases := []struct {
-		name     string
-		mock     MockServiceB
-		expected string
-		hasError bool
+	tests := []struct {
+		name          string
+		mockBResponse int
+		want          string
 	}{
-		{
-			name: "Success with 'hello'",
-			mock: MockServiceB{
-				Result: 0,
-				Err:    nil,
-			},
-			expected: "hello",
-			hasError: false,
-		},
-		{
-			name: "Success with 'world'",
-			mock: MockServiceB{
-				Result: 1,
-				Err:    nil,
-			},
-			expected: "world",
-			hasError: false,
-		},
-		{
-			name: "Error with empty result",
-			mock: MockServiceB{
-				Result: 1,
-				Err:    errors.New("Error in ProcessingB"),
-			},
-			expected: "",
-			hasError: true,
-		},
+		{"ProcessingB returns 0", 0, "hello"},
+		{"ProcessingB returns non-zero", 1, "world"},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			serviceA := ServiceA{b: tc.mock}
-
-			result, err := serviceA.ProcessingA()
-
-			if result != tc.expected {
-				t.Errorf("Expected %s, but got %s", tc.expected, result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// MockServiceBを設定します。
+			mockB := &MockServiceB{
+				ProcessingBFunc: func() int { return tt.mockBResponse },
 			}
 
-			if (err != nil) != tc.hasError {
-				t.Errorf("Expected error status: %v, but got: %v", tc.hasError, err)
+			a := ServiceA{b: mockB}
+
+			result := a.ProcessingA()
+
+			if result != tt.want {
+				t.Errorf("ProcessingA() = %v, want %v", result, tt.want)
 			}
 		})
 	}
