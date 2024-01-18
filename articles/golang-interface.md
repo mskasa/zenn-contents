@@ -8,18 +8,15 @@ published: false
 
 ## 概要
 
-**本記事の流れは以下の通りです。**
-1. インタフェースによる抽象化について、簡単な例で解説します
-2. インタフェースのメリットについて、以下3つの観点から解説します
-   - ソースコードの再利用性
-   - ソースコードの拡張性
-   - ソースコードのテスタビリティ
-3. インタフェースの使いどころについて解説します
+- 本記事の流れは以下の通りです
+  1. インタフェースによる抽象化について解説
+  2. インタフェースのメリットについて解説
+  3. インタフェースの使いどころについて解説
 
-**本記事の想定読者は以下の通りです。**
-- Go言語でのインタフェースの定義方法など、基本的な部分は勉強済みである
-- インタフェースのメリットや使いどころが分からない
-- 他言語と Go言語のインタフェースの違いについて知りたい
+- 本記事の想定読者は以下の通りです
+  - Go言語でのインタフェースの定義方法など、基本的な部分は勉強済みである
+  - インタフェースのメリットが分からない
+  - インタフェースの使いどころが分からない
 
 ## インタフェースによる抽象化
 
@@ -64,20 +61,11 @@ func (r Rectangle) Area() float64 {
 - ソースコードの拡張性
 - ソースコードのテスタビリティ
 
-### ソースコードの再利用性の向上（共通化）
+### ソースコードの再利用性向上（共通化）
 
 まずは以下のサンプルコードを見てください。
 
 ```go
-func BufferToUpper(buf *bytes.Buffer) {
-	data := make([]byte, buf.Len())
-	len, _ := buf.Read(data)
-	str := string(data[:len])
-
-	result := strings.ToUpper(str)
-	fmt.Println(result)
-}
-
 func StringToUpper(s *strings.Reader) {
 	data := make([]byte, 300)
 	len, _ := s.Read(data)
@@ -97,11 +85,6 @@ func FileToUpper(f *os.File) {
 }
 
 func main() {
-	// バッファからの読み取り
-	var buf bytes.Buffer
-	buf.WriteString("This is data from bytes.Buffer.")
-	BufferToUpper(&buf)
-
 	// 文字列リーダーからの読み取り
 	strReader := strings.NewReader("This is a sample string.")
 	StringToUpper(strReader)
@@ -117,41 +100,20 @@ func main() {
 }
 ```
 
-`BufferToUpper()`、`StringToUpper()`、`FileToUpper()`は、いずれも引数として受け取った値を大文字に変換する関数です。実装をよく見ると、引数が異なるだけで、処理内容はほとんど同じなので、できれば共通化したいです。
+`StringToUpper()`と`FileToUpper()`は、どちらも引数として受け取った値を大文字に変換する関数です。引数が異なりますが処理内容は同じなので、可能であれば共通化したいですね。
 
-現状、それぞれが具体的なデータソース（バッファ、文字列、ファイル）を読み込む関数として実装されているので、「読み込むこと」を抽象化したインタフェース`io.Reader`を利用すれば共通化できそうです。
+現状、それぞれが具体的なデータソースを読み込む関数として実装されているので、「読み込むこと」を抽象化したインタフェース`io.Reader`を利用すれば共通化できそうです。
 
-`io.Reader`は、Go言語標準の `io`パッケージに定義されているインタフェースで、この例にあるすべての型（`bytes.Buffer`、`strings.Reader`、`os.File`）は`io.Reader`を実装しています。
+`io.Reader`は、Go言語標準の `io`パッケージに定義されているインタフェースで、`strings.Reader`型と`os.File`型はどちらも`io.Reader`を実装しています。
 
 :::details 詳細
+- `io.Reader`：https://github.com/golang/go/blob/master/src/io/io.go
 ```go
 type Reader interface {
 	Read(p []byte) (n int, err error)
 }
 ```
-出典:https://github.com/golang/go/blob/master/src/io/io.go
-
-```go
-func (b *Buffer) Read(p []byte) (n int, err error) {
-	b.lastRead = opInvalid
-	if b.empty() {
-		// Buffer is empty, reset to recover space.
-		b.Reset()
-		if len(p) == 0 {
-			return 0, nil
-		}
-		return 0, io.EOF
-	}
-	n = copy(p, b.buf[b.off:])
-	b.off += n
-	if n > 0 {
-		b.lastRead = opRead
-	}
-	return n, nil
-}
-```
-出典：https://github.com/golang/go/blob/master/src/bytes/buffer.go
-
+- `strings.Reader`：https://github.com/golang/go/blob/master/src/strings/reader.go
 ```go
 func (r *Reader) Read(b []byte) (n int, err error) {
 	if r.i >= int64(len(r.s)) {
@@ -163,8 +125,7 @@ func (r *Reader) Read(b []byte) (n int, err error) {
 	return
 }
 ```
-出典：https://github.com/golang/go/blob/master/src/strings/reader.go
-
+- `os.File`：https://github.com/golang/go/blob/master/src/os/file.go
 ```go
 func (f *File) Read(b []byte) (n int, err error) {
 	if err := f.checkValid("read"); err != nil {
@@ -174,7 +135,6 @@ func (f *File) Read(b []byte) (n int, err error) {
 	return n, f.wrapErr("read", e)
 }
 ```
-出典：https://github.com/golang/go/blob/master/src/os/file.go
 :::
 
 
@@ -211,14 +171,14 @@ func main() {
 }
 ```
 
-結果的に、関数`ToUpper()`が複数回呼び出されるようになります。
+結果的に、`ToUpper()`が複数回呼び出されるようになります。
 ソースコードの共通化、これ即ちソースコードの再利用性向上というわけです。
 
-以上が、インタフェースのメリットの1つであるソースコードの共通化で、これがソースコードの再利用性向上に寄与しています。
+以上が、インタフェースのメリットの1つであるソースコードの共通化であり、これがソースコードの再利用性向上に寄与しているわけです。
 
-### ソースコードの拡張性の向上
+### ソースコードの拡張性向上
 
-本章では、Go言語のビルトインの`error`インタフェースを例に、ソースコードの拡張性について見ていきます。
+次は、Go言語のビルトインの`error`インタフェースを例に、ソースコードの拡張性について見ていきます。
 
 `error`インタフェースは以下の様に非常にシンプルな定義です。唯一のメソッドは`Error()`で、これはエラーメッセージを文字列で返すだけです。このシンプルさが拡張性を高める一因となっています。
 
@@ -239,7 +199,7 @@ type error interface {
  }
 ```
 
-`err`の型が知りたいため、reflectパッケージの`TypeOf()`処理を追加しています。
+`err`の型を見たいので、reflectパッケージの`TypeOf()`処理を追加しています。
 結果、`fs`パッケージの`PathError`型が返ってきているようです。
 
 ```
@@ -247,7 +207,7 @@ Error type: *fs.PathError
 Error opening file: open example.txt: no such file or directory
 ```
 
-ソースコードを辿っていくと、以下の実装に辿り着きました。`PathError`型が `error`インタフェースを実装していることが分かりますね。
+`PathError`型は以下の様に定義されています。`Error()`メソッドを備えており、`error`インタフェースを満たしていますね。
 
 ```go
 type PathError struct {
@@ -288,8 +248,8 @@ func main() {
 ```
 
 :::message
-補足：`Error()`はどのタイミングで実行される？
-fmtパッケージに errorインタフェースの実装を渡すことで、内部的に`err.Error()`が実行されます。上のコードでは`fmt.Println(err)`の部分です。
+補足：`Error()`メソッドはどこで実行される？
+`fmt`パッケージに`error`インタフェースを実装するオブジェクトを渡すことで、内部的に`Error()`メソッドが実行されます。この例では、`fmt.Println(err)`の部分でこの動作が行われています。
 :::
 
 このように、独自のエラー型を定義し、`Error()`メソッドを実装することで、特定の情報や振る舞いを持つ新しいカスタムエラーを簡単に作成できます。以上のことから、インタフェースがソースコードの拡張性に寄与していることが分かります。
