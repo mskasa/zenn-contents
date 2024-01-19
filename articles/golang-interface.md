@@ -2,7 +2,7 @@
 title: "Go言語 インタフェースのメリットと使いどころを分かりやすく解説"
 emoji: "🚀"
 type: "tech" # tech: 技術記事 / idea: アイデア
-topics: [go]
+topics: [go, interface, di]
 published: false
 ---
 
