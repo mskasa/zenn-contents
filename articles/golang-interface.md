@@ -298,7 +298,7 @@ type ServiceA struct{}
 type ServiceB struct{}
 
 func (a ServiceA) ProcessingA() string {
-	// ServiceB型を実装
+	// ServiceB型のインスタンスを生成
 	b := ServiceB{}
 	res := b.ProcessingB()
 	// ProcessingB の処理結果如何で、なんやかんや
@@ -321,19 +321,15 @@ func main() {
 }
 ```
 
-上のコードでは、`ServiceA`型の`ProcessingA()`内で、`ServiceB`型を実装しています。そして、`ServiceB`型の`ProcessingB()`の処理結果に応じて`ProcessingA()`の処理結果が変わります。
+上のコードでは、`ServiceA`内で`ServiceB`のインスタンスを生成しており、`ProcessingB()`の処理結果に応じて`ProcessingA()`の処理結果が変わります。
 
-つまり、`ServiceA`型が`ServiceB`型に依存しており、`ProcessingA()`の単体テストが不可能な状態であるといえます。
+つまり、`ServiceA`が`ServiceB`に依存しており、`ProcessingA()`の単体テストが不可能な状態であるといえます。
 
 `ProcessingB()`が簡単な処理で、自チームで開発されているのであれば問題ないかもしれません。しかし、複雑な処理であったり、他チームが開発しているとなると、開発上の大きな問題になってしまいます。
 
-これを解決するのが、オブジェクト指向言語でいうところの依存性の注入（Dependency Injection, DI）になります。DIは難しくとらわれがちですが、ただ単に外部からインスタンスを渡してあげることに他なりません。
+これを解決するのが、依存性の注入（Dependency Injection, DI）になります。DIは難しくとらわれがちですが、ただ単に外部からインスタンスを渡してあげることに他なりません。
 
-:::message
-Go言語はオブジェクト指向言語ではないため、オブジェクトやインスタンスという概念がありません。そのため「型」や「型の実装」という表現をここでは使用しますが、オブジェクト指向言語に慣れている方は「型」を「オブジェクト」、「型の実装」を「インスタンス」と読み替えていただくと咀嚼しやすいと思います。
-:::
-
-では、依存性(`ServiceB`型への依存)を外部から注入するように変更してみます。
+では、依存性(`ServiceB`への依存)を外部から注入するように変更してみます。
 
 ```diff go
 -type ServiceA struct{}
@@ -344,7 +340,7 @@ Go言語はオブジェクト指向言語ではないため、オブジェクト
  type ServiceB struct{}
 
  func (a ServiceA) ProcessingA() string {
--	// ServiceB型を実装
+-	// ServiceB型のインスタンスを生成
 -	b := ServiceB{}
 -	res := b.ProcessingB()
 +	res := a.b.ProcessingB()
@@ -364,14 +360,14 @@ Go言語はオブジェクト指向言語ではないため、オブジェクト
  func main() {
 -	a := ServiceA{}
 +	a := ServiceA{
-+		b: ServiceB{},	// ServiceB型の実装を注入
++		b: ServiceB{},	// ServiceB型のインスタンスを渡す
 +	}
  	result := a.ProcessingA()
  	fmt.Println(result)
  }
 ```
 
-`ServiceB`型の実装を外部から渡すように変更しました。
+`ServiceB`型のインスタンスを外部から渡すように変更しました。
 
 しかし、具象型（構造体）である`ServiceB`に依存していることに変わりはありません。抽象型（インタフェース）である`ServiceBInterface`を定義し、そのインタフェースに依存するように変更します。
 
@@ -415,7 +411,7 @@ func (b ServiceB) ProcessingB() int {
 
 func main() {
 	a := ServiceA{
-		b: ServiceB{}, // ServiceB型の実装を注入
+		b: ServiceB{}, // ServiceB型のインスタンスを渡す
 	}
 	result := a.ProcessingA()
 	fmt.Println(result)
@@ -423,7 +419,7 @@ func main() {
 ```
 :::
 
-これで、具体的な実装から分離することができました。以下の様に`ProcessingB()`のモックを作成することで、`ProcessingA()`の単体テストを記述することができます。
+これで、具体的な実装から分離することができました。以下の様に`ProcessingB()`のモックを作成することで、`ProcessingA()`の単体テストが可能になります。
 
 ```go
 type MockServiceB struct {
@@ -446,7 +442,6 @@ func TestProcessingA(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// MockServiceBを設定します。
 			mockB := &MockServiceB{
 				ProcessingBFunc: func() int { return tt.mockBResponse },
 			}
@@ -463,7 +458,7 @@ func TestProcessingA(t *testing.T) {
 }
 ```
 
-以上が、具体的な実装ではなく抽象（インタフェース）に依存させることで疎結合を促進させ、
+以上が、具体的な実装ではなく抽象（インタフェース）に依存させることでコンポーネント間を疎結合にして、ソースコードのテスタビリティを向上させる例です。
 
 ## インタフェースの使いどころ
 
