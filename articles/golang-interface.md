@@ -180,7 +180,7 @@ func main() {
 
 次は、Go言語のビルトインの`error`インタフェースを例に、ソースコードの拡張性について見ていきます。
 
-`error`インタフェースは以下の様に非常にシンプルな定義です。唯一のメソッドは`Error()`で、これはエラーメッセージを文字列で返すだけです。このシンプルさが拡張性を高める一因となっています。
+`error`インタフェースは以下の様に非常にシンプルな定義です。唯一のメソッドは`Error()`で、これはエラー情報を文字列で返すだけです。このシンプルさが拡張性を高める一因となっています。
 
 ```go
 type error interface {
@@ -220,9 +220,20 @@ func (e *PathError) Error() string { return e.Op + " " + e.Path + ": " + e.Err.E
 ```
 出典：https://github.com/golang/go/blob/master/src/io/fs/fs.go#L244-L250
 
-この例が示すことは、誰でも簡単に独自のカスタムエラーを作成できるということです。例えば、`MyError`型を定義する場合は以下の様になります。
+このように、Go言語の`error`インターフェースは、標準ライブラリやサードパーティのライブラリにおいて広く利用されています。
+
+また、この例が示すことは、誰でも簡単に独自のカスタムエラー型を作成できるということです。
+
+試しに、独自のカスタムエラー型を作成し、エラーハンドリングを拡張してみましょう。
+`MyError`型を定義し、エラーが致命的かどうかを判断する処理を追加したサンプルコードは以下の様になります。非常に簡単に拡張できることが分かるかと思います。
 
 ```go
+package main
+
+import (
+	"fmt"
+)
+
 type MyError struct {
 	Code    int
 	Message string
@@ -230,6 +241,10 @@ type MyError struct {
 
 func (e *MyError) Error() string {
 	return fmt.Sprintf("error: code=%d, message=%s", e.Code, e.Message)
+}
+
+func (e *MyError) IsCritical() bool {
+	return e.Code >= 100
 }
 
 func doSomething() error {
@@ -243,8 +258,17 @@ func main() {
 	err := doSomething()
 	if err != nil {
 		fmt.Println(err)
+
+		if myErr, ok := err.(*MyError); ok {
+			if myErr.IsCritical() {
+				fmt.Println("Critical error encountered!")
+			} else {
+				fmt.Println("Non-critical error encountered.")
+			}
+		}
 	}
 }
+
 ```
 
 :::message
@@ -252,7 +276,15 @@ func main() {
 `fmt`パッケージに`error`インタフェースを実装するオブジェクトを渡すことで、内部的に`Error()`メソッドが実行されます。この例では、`fmt.Println(err)`の部分でこの動作が行われています。
 :::
 
-このように、独自のエラー型を定義し、`Error()`メソッドを実装することで、特定の情報や振る舞いを持つ新しいカスタムエラーを簡単に作成できます。以上のことから、インタフェースがソースコードの拡張性に寄与していることが分かります。
+ここまでの内容をまとめると、以下になります。
+
+- シンプルなインターフェース定義
+  - `Error()`メソッドを実装するだけで、`error`インターフェースを満たすことができます。このシンプルさのおかげで、開発者は新しいカスタムエラー型を簡単に追加できます。
+
+- 広範囲な互換性の提供
+  - Go言語の`error`インターフェースは、標準ライブラリやサードパーティのライブラリにおいて広く利用されています。そのため、新しいカスタムエラー型を導入しても、既存のエラーハンドリングを大幅に変更する必要はありません。
+
+以上が、`error`インタフェースを例にした、インタフェースによるソースコードの拡張性向上についての解説になります。
 
 ### ソースコードのテスタビリティ向上
 
