@@ -288,7 +288,7 @@ func main() {
 
 ### ソースコードのテスタビリティ向上
 
-インタフェースを利用することで、コンポーネント間を疎結合にすることができます。
+あるオブジェクトが具体的な実装に依存している場合、それを抽象（インタフェース）への依存に変更することで、コンポーネント間を疎結合にすることができます。疎結合にすることでコンポーネントは交換可能になり、テスタビリティが向上します。
 
 まずは以下のサンプルコードを見てください。
 
@@ -301,7 +301,7 @@ func (a ServiceA) ProcessingA() string {
 	// ServiceB型のインスタンスを生成
 	b := ServiceB{}
 	res := b.ProcessingB()
-	// ProcessingB の処理結果如何で、なんやかんや
+	// ProcessingBの処理結果に応じて何か色々する
 	if res == 0 {
 		return "hello"
 	} else {
@@ -310,7 +310,7 @@ func (a ServiceA) ProcessingA() string {
 }
 
 func (b ServiceB) ProcessingB() int {
-	// なんやかんや
+	// 何か複雑な処理
 	return 0
 }
 
@@ -321,13 +321,13 @@ func main() {
 }
 ```
 
-上のコードでは、`ServiceA`内で`ServiceB`のインスタンスを生成しており、`ProcessingB()`の処理結果に応じて`ProcessingA()`の処理結果が変わります。
+`ServiceA`内で`ServiceB`のインスタンスを生成しており、`ProcessingB()`の処理結果に応じて`ProcessingA()`の処理結果が変わるイメージを伝えるためのコードです（色々簡略化していますがご愛嬌ということで）。
 
-つまり、`ServiceA`が`ServiceB`に依存しており、`ProcessingA()`の単体テストが不可能な状態であるといえます。
+つまりは、`ServiceA`が`ServiceB`に依存しており、`ProcessingA()`の単体テストが不可能な状態であるといえます。
 
 `ProcessingB()`が簡単な処理で、自チームで開発されているのであれば問題ないかもしれません。しかし、複雑な処理であったり、他チームが開発しているとなると、開発上の大きな問題になってしまいます。
 
-これを解決するのが、依存性の注入（Dependency Injection, DI）になります。DIは難しくとらわれがちですが、ただ単に外部からインスタンスを渡してあげることに他なりません。
+これを解決するのが、俗に言う依存性の注入（Dependency Injection, DI）になります。DIは言葉が先行しているせいで何やら難しくとらわれがちですが、外部からインスタンスを渡してあげる程度の理解で問題ないと思います。
 
 では、依存性(`ServiceB`への依存)を外部から注入するように変更してみます。
 
@@ -344,7 +344,7 @@ func main() {
 -	b := ServiceB{}
 -	res := b.ProcessingB()
 +	res := a.b.ProcessingB()
- 	// ProcessingB の処理結果如何で、なんやかんや
+ 	// ProcessingBの処理結果に応じて何か色々する
  	if res == 0 {
  		return "hello"
  	} else {
@@ -353,7 +353,7 @@ func main() {
  }
 
  func (b ServiceB) ProcessingB() int {
- 	// なんやかんや
+ 	// 何か複雑な処理
  	return 0
  }
 
@@ -396,7 +396,7 @@ type ServiceBInterface interface {
 
 func (a ServiceA) ProcessingA() string {
 	res := a.b.ProcessingB()
-	// ProcessingB の処理結果如何で、なんやかんや
+	// ProcessingBの処理結果に応じて何か色々する
 	if res == 0 {
 		return "hello"
 	} else {
@@ -405,7 +405,7 @@ func (a ServiceA) ProcessingA() string {
 }
 
 func (b ServiceB) ProcessingB() int {
-	// なんやかんや
+	// 何か複雑な処理
 	return 0
 }
 
@@ -458,7 +458,7 @@ func TestProcessingA(t *testing.T) {
 }
 ```
 
-以上が、具体的な実装ではなく抽象（インタフェース）に依存させることでコンポーネント間を疎結合にして、ソースコードのテスタビリティを向上させる例です。
+以上が、インタフェースによるソースコードのテスタビリティ向上についての解説になります。
 
 ## インタフェースの使いどころ
 
