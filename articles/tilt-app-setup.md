@@ -93,6 +93,53 @@ brew install tilt-dev/tap/tilt
 tilt version
 ```
 
+## アプリケーションの構築
+
+docker exec -it kind-control-plane crictl rmi --prune
+
+## DBの構築
+
+## docker registry ui の導入
+
+## まとめ
+現場でTiltを使ってローカル開発環境を構築したので、紹介記事を書いてみました。日本語のリファレンスが少ないため、この記事が誰かの足掛かりになれば幸いです。
+以上です。
+
+
+
+docker exec -it kind-control-plane crictl images
+docker exec -it kind-control-plane crictl rmi --prune
+
+docker builder prune
+
+ERROR: failed to solve: failed to copy files: userspace copy failed: write /var/lib/docker/overlay2/ibl8di2t988krwjjucp7wtc2d/merged/app/.next/cache/webpack/client-development/11.pack: no space left on device
+
+
+docker build --target registry -t local-registry .
+ctlptl create registry local-registry --port=5000 --image local-registry:latest
+docker run -d --name local-registry --network kind -p 5000:5000 local-registry:latest
+docker run -d \
+  -p 5005:80 \
+  --name registry-ui \
+  -e SINGLE_REGISTRY=true \
+  -e REGISTRY_TITLE="My Docker Registry" \
+  -e REGISTRY_URL="http://127.0.0.1:5000" \
+  -e DELETE_IMAGES=true \
+  -e SHOW_CATALOG_NB_TAGS=true \
+  -e CATALOG_MIN_BRANCHES=1 \
+  -e CATALOG_MAX_BRANCHES=1 \
+  -e TAGLIST_PAGE_SIZE=100 \
+  -e REGISTRY_SECURED=false \
+  -e CATALOG_ELEMENTS_LIMIT=1000 \
+  joxit/docker-registry-ui:2.5.7
+ctlptl create cluster kind --registry=local-registry
+
+
+kind delete cluster
+docker network rm kind
+
+
+
 ### ctlptl
 - [インストール](https://github.com/tilt-dev/ctlptl)
 ```sh
@@ -102,13 +149,3 @@ brew install tilt-dev/tap/ctlptl
 ```sh
 ctlptl version
 ```
-
-## アプリケーションの構築
-
-## DBの構築
-
-## docker registry ui の導入
-
-## まとめ
-現場でTiltを使ってローカル開発環境を構築したので、紹介記事を書いてみました。日本語のリファレンスが少ないため、この記事が誰かの足掛かりになれば幸いです。
-以上です。
