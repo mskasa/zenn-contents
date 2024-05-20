@@ -149,3 +149,98 @@ brew install tilt-dev/tap/ctlptl
 ```sh
 ctlptl version
 ```
+
+
+
+
+```yaml:kind-config.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+containerdConfigPatches:
+- |-
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
+    endpoint = ["http://host.docker.internal:5000"]
+```
+
+```sh
+kind create cluster --config kind-config.yaml
+```
+
+```sh
+docker network ls
+NETWORK ID     NAME      DRIVER    SCOPE
+cc422730a822   kind      bridge    local
+```
+
+```yaml:docker-registry-config.yml
+version: 0.1
+log:
+  fields:
+    service: registry
+storage:
+  delete:
+      enabled: true
+  cache:
+    blobdescriptor: inmemory
+  filesystem:
+    rootdirectory: /var/lib/registry
+http:
+  addr: :5000
+  headers:
+    Access-Control-Allow-Origin: ['*']
+    X-Content-Type-Options: [nosniff]
+    Access-Control-Allow-Methods: ['HEAD', 'GET', 'OPTIONS', 'DELETE']
+    Access-Control-Allow-Headers: ['Authorization', 'Accept', 'Cache-Control']
+    Access-Control-Expose-Headers: ['Docker-Content-Digest']
+health:
+  storagedriver:
+    enabled: true
+    interval: 10s
+    threshold: 3
+```
+
+```dockerfile:Dockerfile
+FROM golang:1.22 as go_builder
+
+FROM registry:2 as registry
+COPY docker-registry-config.yml /etc/docker/registry/config.yml
+```
+
+```sh
+docker build --target registry -t local-registry .
+```
+
+```sh
+docker run -d --name local-registry --network kind -p 127.0.0.1:5000:5000 local-registry:latest
+```
+
+```sh
+docker run -d \
+  -p 5005:80 \
+  --name registry-ui \
+  -e SINGLE_REGISTRY=true \
+  -e REGISTRY_TITLE="My Docker Registry" \
+  -e REGISTRY_URL="http://127.0.0.1:5000" \
+  -e DELETE_IMAGES=true \
+  -e SHOW_CATALOG_NB_TAGS=true \
+  -e CATALOG_MIN_BRANCHES=1 \
+  -e CATALOG_MAX_BRANCHES=1 \
+  -e TAGLIST_PAGE_SIZE=100 \
+  -e REGISTRY_SECURED=false \
+  -e CATALOG_ELEMENTS_LIMIT=1000 \
+  joxit/docker-registry-ui:2.5.7
+```
+
+[http://localhost:5005/](http://localhost:5005/)にアクセス
+![](/images/tilt-app-setup/docker-registry-ui-01.png)
+
+```sh
+docker ps
+CONTAINER ID   IMAGE                            COMMAND                   CREATED         STATUS         PORTS                       NAMES
+1f4cc50af0dc   joxit/docker-registry-ui:2.5.7   "/docker-entrypoint.…"   7 minutes ago   Up 7 minutes   0.0.0.0:5005->80/tcp        registry-ui
+2df64277b5bb   local-registry:latest            "/entrypoint.sh /etc…"   7 minutes ago   Up 7 minutes   127.0.0.1:5000->5000/tcp    local-registry
+d4c77bcc7c6d   kindest/node:v1.29.2             "/usr/local/bin/entr…"   8 minutes ago   Up 8 minutes   127.0.0.1:50936->6443/tcp   kind-control-plane
+```
+
