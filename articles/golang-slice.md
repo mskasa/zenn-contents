@@ -87,13 +87,22 @@ slice := make([]int, 0, 100)
 ```go
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"unsafe"
+)
 
 type Employee struct {
-	ID   int
-	Name string
-	Age  int
-	// 他のフィールド
+	ID        int
+	Name      string
+	Age       int
+	Address   string
+	Email     string
+	Phone     string
+	Position  string
+	Salary    float64
+	StartDate string
+	IsActive  bool
 }
 
 func main() {
@@ -102,31 +111,73 @@ func main() {
 
 	for i := 1; i <= 5; i++ {
 		employees1 = append(employees1, Employee{
-			ID:   i,
-			Name: fmt.Sprintf("Employee %d", i),
-			Age:  20 + i,
+			ID:        i,
+			Name:      fmt.Sprintf("Employee %d", i),
+			Age:       20 + i,
+			Address:   fmt.Sprintf("Address %d", i),
+			Email:     fmt.Sprintf("employee%d@example.com", i),
+			Phone:     fmt.Sprintf("555-000%d", i),
+			Position:  "Position",
+			Salary:    30000.0 + float64(i)*1000,
+			StartDate: fmt.Sprintf("2022-01-%02d", i),
+			IsActive:  true,
 		})
 	}
-	fmt.Println("構造体のスライス:", employees1)
+	fmt.Println("構造体のスライス:")
+	for _, employee := range employees1 {
+		fmt.Printf("%+v\n", employee)
+	}
+
+	// 構造体のスライスのメモリ使用量を表示
+	structSize := unsafe.Sizeof(employees1[0])
+	totalStructSize := structSize * uintptr(len(employees1))
+	fmt.Printf("構造体のスライスのメモリ使用量: %d bytes\n", totalStructSize)
 
 	// 構造体のポインタのスライスを使用する場合
 	var employees2 []*Employee
 
 	for i := 1; i <= 5; i++ {
 		employees2 = append(employees2, &Employee{
-			ID:   i,
-			Name: fmt.Sprintf("Employee %d", i),
-			Age:  20 + i,
+			ID:        i,
+			Name:      fmt.Sprintf("Employee %d", i),
+			Age:       20 + i,
+			Address:   fmt.Sprintf("Address %d", i),
+			Email:     fmt.Sprintf("employee%d@example.com", i),
+			Phone:     fmt.Sprintf("555-000%d", i),
+			Position:  "Position",
+			Salary:    30000.0 + float64(i)*1000,
+			StartDate: fmt.Sprintf("2022-01-%02d", i),
+			IsActive:  true,
 		})
 	}
-	fmt.Println("構造体のポインタのスライス:", employees2)
+	fmt.Println("構造体のポインタのスライス:")
+	for _, employee := range employees2 {
+		fmt.Printf("%p\n", employee)
+	}
+
+	// 構造体のポインタのスライスのメモリ使用量を表示
+	pointerSize := unsafe.Sizeof(employees2[0])
+	totalPointerSize := pointerSize * uintptr(len(employees2))
+	fmt.Printf("構造体のポインタのスライスのメモリ使用量: %d bytes\n", totalPointerSize)
 }
 ```
 
 実行結果
 ```
-構造体のスライス: [{1 Employee 1 21} {2 Employee 2 22} {3 Employee 3 23} {4 Employee 4 24} {5 Employee 5 25}]
-構造体のポインタのスライス: [0xc0000680e0 0xc000068100 0xc000068120 0xc000068160 0xc000068180]
+構造体のスライス:
+{ID:1 Name:Employee 1 Age:21 Address:Address 1 Email:employee1@example.com Phone:555-0001 Position:Position Salary:31000 StartDate:2022-01-01 IsActive:true}
+{ID:2 Name:Employee 2 Age:22 Address:Address 2 Email:employee2@example.com Phone:555-0002 Position:Position Salary:32000 StartDate:2022-01-02 IsActive:true}
+{ID:3 Name:Employee 3 Age:23 Address:Address 3 Email:employee3@example.com Phone:555-0003 Position:Position Salary:33000 StartDate:2022-01-03 IsActive:true}
+{ID:4 Name:Employee 4 Age:24 Address:Address 4 Email:employee4@example.com Phone:555-0004 Position:Position Salary:34000 StartDate:2022-01-04 IsActive:true}
+{ID:5 Name:Employee 5 Age:25 Address:Address 5 Email:employee5@example.com Phone:555-0005 Position:Position Salary:35000 StartDate:2022-01-05 IsActive:true}
+構造体のスライスのメモリ使用量: 640 bytes
+構造体のポインタのスライス:
+0xc0000bc300
+0xc0000bc380
+0xc0000bc400
+0xc0000bc480
+0xc0000bc500
+構造体のポインタのスライスのメモリ使用量: 40 bytes
 ```
 
 データ量の減少についての説明
