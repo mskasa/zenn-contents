@@ -272,14 +272,156 @@ slice：[0 0 0 1]
 ```
 
 色々とややこしいことが分かったと思います。
-唯一、スライスのポインタを使用した場合のみ、意図した結果が返ってきましたが、もっと単純で直感的なコードがあります。
+唯一、スライスのポインタを使用した場合のみ、意図した結果が返ってきましたが、もっと単純で直感的に返り値で明示的にスライスを返してあげるのが個人的にベストかと思います。
 
-返り値で明示的にスライスを返してあげるのが個人的にベストかと思います。
 
-### Go は値渡し
+```go
+package main
 
-> As in all languages in the C family, everything in Go is passed by value. That is, a function always gets a copy of the thing being passed, as if there were an assignment statement assigning the value to the parameter. (引用元：https://go.dev/doc/faq#pass_by_value)
+import (
+	"fmt"
+	"runtime"
+	"unsafe"
+)
 
-Goでは、関数に引数を渡した際、必ず引数の値のコピーを作成します。参照渡しはありません。
+func main() {
+	// GC実行前のメモリ統計を取得
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	fmt.Printf("GC前: Alloc = %v MiB\n", bToMb(memStats.Alloc))
+	fmt.Printf("GC前: TotalAlloc = %v MiB\n", bToMb(memStats.TotalAlloc))
+	fmt.Printf("GC前: Sys = %v MiB\n", bToMb(memStats.Sys))
+	fmt.Printf("GC前: NumGC = %v\n\n", memStats.NumGC)
 
-関数内のappend()に注意する
+	// 大きなスライスを作成してから部分スライスを取得
+	largeSlice := make([]int, 100000000) // 1億要素の大きなスライス
+	subSlice := largeSlice[:1]           // 最初の1要素だけを参照する
+
+	fmt.Printf("largeSliceのポインタ: %p\n", unsafe.Pointer(&largeSlice[0]))
+	fmt.Printf("subSliceのポインタ: %p\n", unsafe.Pointer(&subSlice[0]))
+
+	// largeSliceを解放してGCが解放されるかチェック
+	largeSlice = nil
+
+	// メモリを強制的に解放
+	runtime.GC()
+
+	// GC実行後のメモリ統計を取得
+	runtime.ReadMemStats(&memStats)
+	fmt.Printf("GC後: Alloc = %v MiB\n", bToMb(memStats.Alloc))
+	fmt.Printf("GC後: TotalAlloc = %v MiB\n", bToMb(memStats.TotalAlloc))
+	fmt.Printf("GC後: Sys = %v MiB\n", bToMb(memStats.Sys))
+	fmt.Printf("GC後: NumGC = %v\n\n", memStats.NumGC)
+
+	// subSliceを保持し続ける
+	fmt.Printf("subSliceを参照中: %v\n", subSlice)
+
+	// もう一度GCを強制実行して確認
+	runtime.GC()
+	runtime.ReadMemStats(&memStats)
+	fmt.Printf("再度GC後: Alloc = %v MiB\n", bToMb(memStats.Alloc))
+	fmt.Printf("再度GC後: TotalAlloc = %v MiB\n", bToMb(memStats.TotalAlloc))
+	fmt.Printf("再度GC後: Sys = %v MiB\n", bToMb(memStats.Sys))
+	fmt.Printf("再度GC後: NumGC = %v\n\n", memStats.NumGC)
+}
+
+func bToMb(b uint64) uint64 {
+	return b / 1024 / 1024
+}
+```
+
+```
+GC前: Alloc = 0 MiB
+GC前: TotalAlloc = 0 MiB
+GC前: Sys = 6 MiB
+GC前: NumGC = 0
+
+largeSliceのポインタ: 0xc000180000
+subSliceのポインタ: 0xc000180000
+GC後: Alloc = 763 MiB
+GC後: TotalAlloc = 763 MiB
+GC後: Sys = 771 MiB
+GC後: NumGC = 2
+
+subSliceを参照中: [0]
+再度GC後: Alloc = 0 MiB
+再度GC後: TotalAlloc = 763 MiB
+再度GC後: Sys = 771 MiB
+再度GC後: NumGC = 3
+```
+
+```go
+package main
+
+import (
+	"fmt"
+	"runtime"
+	"slices"
+	"unsafe"
+)
+
+func main() {
+	// GC実行前のメモリ統計を取得
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	fmt.Printf("GC前: Alloc = %v MiB\n", bToMb(memStats.Alloc))
+	fmt.Printf("GC前: TotalAlloc = %v MiB\n", bToMb(memStats.TotalAlloc))
+	fmt.Printf("GC前: Sys = %v MiB\n", bToMb(memStats.Sys))
+	fmt.Printf("GC前: NumGC = %v\n\n", memStats.NumGC)
+
+	// 大きなスライスを作成してから部分スライスを取得
+	largeSlice := make([]int, 100000000)     // 1億要素の大きなスライス
+	subSlice := slices.Clone(largeSlice[:1]) // 最初の1要素だけを参照する
+
+	fmt.Printf("largeSliceのポインタ: %p\n", unsafe.Pointer(&largeSlice[0]))
+	fmt.Printf("subSliceのポインタ: %p\n", unsafe.Pointer(&subSlice[0]))
+
+	// largeSliceを解放してGCが解放されるかチェック
+	largeSlice = nil
+
+	// メモリを強制的に解放
+	runtime.GC()
+
+	// GC実行後のメモリ統計を取得
+	runtime.ReadMemStats(&memStats)
+	fmt.Printf("GC後: Alloc = %v MiB\n", bToMb(memStats.Alloc))
+	fmt.Printf("GC後: TotalAlloc = %v MiB\n", bToMb(memStats.TotalAlloc))
+	fmt.Printf("GC後: Sys = %v MiB\n", bToMb(memStats.Sys))
+	fmt.Printf("GC後: NumGC = %v\n\n", memStats.NumGC)
+
+	// subSliceを保持し続ける
+	fmt.Printf("subSliceを参照中: %v\n", subSlice)
+
+	// もう一度GCを強制実行して確認
+	runtime.GC()
+	runtime.ReadMemStats(&memStats)
+	fmt.Printf("再度GC後: Alloc = %v MiB\n", bToMb(memStats.Alloc))
+	fmt.Printf("再度GC後: TotalAlloc = %v MiB\n", bToMb(memStats.TotalAlloc))
+	fmt.Printf("再度GC後: Sys = %v MiB\n", bToMb(memStats.Sys))
+	fmt.Printf("再度GC後: NumGC = %v\n\n", memStats.NumGC)
+}
+
+func bToMb(b uint64) uint64 {
+	return b / 1024 / 1024
+}
+```
+
+```
+GC前: Alloc = 0 MiB
+GC前: TotalAlloc = 0 MiB
+GC前: Sys = 6 MiB
+GC前: NumGC = 0
+
+largeSliceのポインタ: 0xc000180000
+subSliceのポインタ: 0xc000012080
+GC後: Alloc = 0 MiB
+GC後: TotalAlloc = 763 MiB
+GC後: Sys = 771 MiB
+GC後: NumGC = 2
+
+subSliceを参照中: [0]
+再度GC後: Alloc = 0 MiB
+再度GC後: TotalAlloc = 763 MiB
+再度GC後: Sys = 771 MiB
+再度GC後: NumGC = 3
+```
