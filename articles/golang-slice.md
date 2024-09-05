@@ -274,6 +274,7 @@ slice：[0 0 0 1]
 色々とややこしいことが分かったと思います。
 唯一、スライスのポインタを使用した場合のみ、意図した結果が返ってきましたが、もっと単純で直感的に返り値で明示的にスライスを返してあげるのが個人的にベストかと思います。
 
+## スライスのメモリ管理とGCへの影響について
 
 ```go
 package main
@@ -424,4 +425,29 @@ subSliceを参照中: [0]
 再度GC後: TotalAlloc = 763 MiB
 再度GC後: Sys = 771 MiB
 再度GC後: NumGC = 3
+```
+
+### 番外編 copy よりも Clone の方が便利
+```go
+package main
+
+import (
+	"fmt"
+	"slices"
+)
+
+func main() {
+	src := []int{0, 1, 2}
+	var cp []int
+	copy(cp, src)
+	fmt.Println("copy:", cp)
+
+	cl := slices.Clone(src)
+	fmt.Println("clone:", cl)
+}
+```
+
+```
+copy: []
+clone: [0 1 2]
 ```
