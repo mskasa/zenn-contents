@@ -60,7 +60,7 @@ func printSliceInfo(label string, s []int) {
 }
 ```
 
-```
+```txt:実行結果
 初期スライス - 長さ: 0, 容量: 2, ポインタ: 0xc00010e010, 要素: []
 追加後 1 - 長さ: 1, 容量: 2, ポインタ: 0xc00010e010, 要素: [1]
 追加後 2 - 長さ: 2, 容量: 2, ポインタ: 0xc00010e010, 要素: [1 2]
@@ -69,7 +69,7 @@ func printSliceInfo(label string, s []int) {
 追加後 5 - 長さ: 5, 容量: 8, ポインタ: 0xc000124000, 要素: [1 2 3 4 5]
 ```
 
-この結果から、スライスの容量が不足すると新しい配列が割り当てられ、容量が2倍に拡張されていることが分かります。容量が2から4、そして8に増加する際に、配列のポインタが変わっている点に注目してください。新しい配列が作成され、既存の要素が新しい配列にコピーされていることが確認できますね。
+この結果から、スライスの容量が不足すると新しい配列が割り当てられ、容量が2倍に拡張されていることが分かります。容量が2から4、そして8に増加する際に、配列のポインタが変わっている点に注目してください。新しい配列が作成され、既存の要素が新しい配列にコピーされていることが確認できます。
 
 ### 初期容量を適切な値に設定する
 スライスを作成する際、最大要素数をある程度予測して初期容量を設定しましょう。これにより、再割り当てとコピーの回数を減らすことができます。以下に、make関数を使用して初期容量を設定する例を示します。
@@ -82,7 +82,7 @@ slice := make([]int, 0, 100)
 
 ただし、これは事前にメモリ領域を確保しているということなので、当然のことながら、必要以上に大きく設定すると、実際には使用されないメモリ領域が確保されることになります。これは、システム全体のメモリ使用量を増加させ、他のプロセスに影響を与える可能性があります。
 
-よって、設定する容量が明確に決まらない場合、特に設定せずに`append()`に任せるのは一般的に良い選択とされています。
+よって、容量が明確に決まらず、`append()`を繰り返すような処理でもなければ、特に初期容量を設定する必要はないでしょう。
 
 ### 構造体のスライスではなくポインタのスライスを使用する
 配列の各要素が多くのフィールドを持つ構造体の場合、その分、再割り当て時のデータコピー量は多くなります。これは、構造体そのものを配列の要素にするのではなく、構造体のポインタを配列の要素にすることで解決できます。
@@ -165,8 +165,7 @@ func main() {
 }
 ```
 
-実行結果
-```
+```txt:実行結果
 構造体のスライス:
 {ID:1 Name:Employee 1 Age:21 Address:Address 1 Email:employee1@example.com Phone:555-0001 Position:Position Salary:31000 StartDate:2022-01-01 IsActive:true}
 {ID:2 Name:Employee 2 Age:22 Address:Address 2 Email:employee2@example.com Phone:555-0002 Position:Position Salary:32000 StartDate:2022-01-02 IsActive:true}
@@ -183,13 +182,13 @@ func main() {
 構造体のポインタのスライスのメモリ使用量: 40 bytes
 ```
 
-結果から分かる通り、ポインタのサイズは通常、固定であり、構造体のサイズが大きくなるほど、その差が顕著になります。このように、大量のデータを持つ構造体のスライスを操作する場合、ポインタのスライスを使用することで再割り当て時のオーバーヘッドが軽減され、処理速度が向上します。
+結果から分かる通り、ポインタのサイズは固定であり、構造体のサイズが大きくなるほど、その差が顕著になります。このように、大量のデータを持つ構造体のスライスを操作する場合、ポインタのスライスを使用することで再割り当て時のオーバーヘッドが軽減され、処理速度が向上します。
 
 ## スライスを関数内で操作するときの挙動に注意する
 
 関数にスライスを渡して、そのスライスを操作する際、意図したとおりの結果が返ってこないことがあります。
 
-以下、それぞれがどのような結果になるでしょうか？
+以下、それぞれについて、スライスの中身がどのようになるか予想してみてください。
 
 ```go
 package main
@@ -202,28 +201,28 @@ func main() {
 	fmt.Printf("sliceのポインタ: %p\n", &slice1)
 	fmt.Printf("sliceが指す配列のポインタ: %p\n", slice1)
 	changeElements(slice1, 1)
-	fmt.Printf("slice：%v\n", slice1)
+	fmt.Printf("slice：%v\n", slice1) // 問1
 
 	fmt.Println("2. ------------------------------")
 	slice2 := make([]int, 3, 3) // [0 0 0]
 	fmt.Printf("sliceのポインタ: %p\n", &slice2)
 	fmt.Printf("sliceが指す配列のポインタ: %p\n", slice2)
 	appendElements(slice2, 1)
-	fmt.Printf("slice：%v\n", slice2)
+	fmt.Printf("slice：%v\n", slice2) // 問2
 
 	fmt.Println("3. ------------------------------")
 	slice3 := make([]int, 3, 5) // [0 0 0]
 	fmt.Printf("sliceのポインタ: %p\n", &slice3)
 	fmt.Printf("sliceが指す配列のポインタ: %p\n", slice3)
 	appendElements(slice3, 1)
-	fmt.Printf("slice：%v\n", slice2)
+	fmt.Printf("slice：%v\n", slice3) // 問3
 
 	fmt.Println("4. ------------------------------")
 	slice4 := make([]int, 3, 3) // [0 0 0]
 	fmt.Printf("sliceのポインタ: %p\n", &slice4)
 	fmt.Printf("sliceが指す配列のポインタ: %p\n", slice4)
 	appendElements2(&slice4, 1)
-	fmt.Printf("slice：%v\n", slice4)
+	fmt.Printf("slice：%v\n", slice4) // 問4
 }
 func changeElements(s []int, elem int) {
 	s[1] = elem
@@ -244,7 +243,7 @@ func appendElements2(s *[]int, elem int) {
 }
 ```
 
-```
+```txt:実行結果
 1. ------------------------------
 sliceのポインタ: 0xc000010018
 sliceが指す配列のポインタ: 0xc00001a018
@@ -255,19 +254,19 @@ slice：[0 1 0]
 sliceのポインタ: 0xc000010090
 sliceが指す配列のポインタ: 0xc00001a030
 sliceのポインタ(関数内): 0xc0000100c0
-sliceが指す配列のポインタ(関数内): 0xc00008a030
+sliceが指す配列のポインタ(関数内): 0xc00010a030
 slice：[0 0 0]
 3. ------------------------------
 sliceのポインタ: 0xc000010108
-sliceが指す配列のポインタ: 0xc00008a060
+sliceが指す配列のポインタ: 0xc00010a060
 sliceのポインタ(関数内): 0xc000010138
-sliceが指す配列のポインタ(関数内): 0xc00008a060
+sliceが指す配列のポインタ(関数内): 0xc00010a060
 slice：[0 0 0]
 4. ------------------------------
 sliceのポインタ: 0xc000010180
 sliceが指す配列のポインタ: 0xc00001a048
 sliceのポインタ(関数内): 0xc000010180
-sliceが指す配列のポインタ(関数内): 0xc00008a090
+sliceが指す配列のポインタ(関数内): 0xc00010a090
 slice：[0 0 0 1]
 ```
 
@@ -331,7 +330,7 @@ func bToMb(b uint64) uint64 {
 }
 ```
 
-```
+```txt:実行結果
 GC前: Alloc = 0 MiB
 GC前: TotalAlloc = 0 MiB
 GC前: Sys = 6 MiB
@@ -351,63 +350,64 @@ subSliceを参照中: [0]
 再度GC後: NumGC = 3
 ```
 
-```go
-package main
+```diff go
+ package main
 
-import (
-	"fmt"
-	"runtime"
-	"slices"
-	"unsafe"
-)
-
-func main() {
-	// GC実行前のメモリ統計を取得
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-	fmt.Printf("GC前: Alloc = %v MiB\n", bToMb(memStats.Alloc))
-	fmt.Printf("GC前: TotalAlloc = %v MiB\n", bToMb(memStats.TotalAlloc))
-	fmt.Printf("GC前: Sys = %v MiB\n", bToMb(memStats.Sys))
-	fmt.Printf("GC前: NumGC = %v\n\n", memStats.NumGC)
-
-	// 大きなスライスを作成してから部分スライスを取得
-	largeSlice := make([]int, 100000000)     // 1億要素の大きなスライス
-	subSlice := slices.Clone(largeSlice[:1]) // 最初の1要素だけを参照する
-
-	fmt.Printf("largeSliceのポインタ: %p\n", unsafe.Pointer(&largeSlice[0]))
-	fmt.Printf("subSliceのポインタ: %p\n", unsafe.Pointer(&subSlice[0]))
-
-	// largeSliceを解放してGCが解放されるかチェック
-	largeSlice = nil
-
-	// メモリを強制的に解放
-	runtime.GC()
-
-	// GC実行後のメモリ統計を取得
-	runtime.ReadMemStats(&memStats)
-	fmt.Printf("GC後: Alloc = %v MiB\n", bToMb(memStats.Alloc))
-	fmt.Printf("GC後: TotalAlloc = %v MiB\n", bToMb(memStats.TotalAlloc))
-	fmt.Printf("GC後: Sys = %v MiB\n", bToMb(memStats.Sys))
-	fmt.Printf("GC後: NumGC = %v\n\n", memStats.NumGC)
-
-	// subSliceを保持し続ける
-	fmt.Printf("subSliceを参照中: %v\n", subSlice)
-
-	// もう一度GCを強制実行して確認
-	runtime.GC()
-	runtime.ReadMemStats(&memStats)
-	fmt.Printf("再度GC後: Alloc = %v MiB\n", bToMb(memStats.Alloc))
-	fmt.Printf("再度GC後: TotalAlloc = %v MiB\n", bToMb(memStats.TotalAlloc))
-	fmt.Printf("再度GC後: Sys = %v MiB\n", bToMb(memStats.Sys))
-	fmt.Printf("再度GC後: NumGC = %v\n\n", memStats.NumGC)
-}
-
-func bToMb(b uint64) uint64 {
-	return b / 1024 / 1024
-}
+ import (
+ 	"fmt"
+ 	"runtime"
+ 	"slices"
+ 	"unsafe"
+ )
+ 
+ func main() {
+ 	// GC実行前のメモリ統計を取得
+ 	var memStats runtime.MemStats
+ 	runtime.ReadMemStats(&memStats)
+ 	fmt.Printf("GC前: Alloc = %v MiB\n", bToMb(memStats.Alloc))
+ 	fmt.Printf("GC前: TotalAlloc = %v MiB\n", bToMb(memStats.TotalAlloc))
+ 	fmt.Printf("GC前: Sys = %v MiB\n", bToMb(memStats.Sys))
+ 	fmt.Printf("GC前: NumGC = %v\n\n", memStats.NumGC)
+ 
+ 	// 大きなスライスを作成してから部分スライスを取得
+ 	largeSlice := make([]int, 100000000)     // 1億要素の大きなスライス
+-	subSlice := largeSlice[:1]               // 最初の1要素だけを参照する
++	subSlice := slices.Clone(largeSlice[:1]) // 最初の1要素だけを参照する
+ 
+ 	fmt.Printf("largeSliceのポインタ: %p\n", unsafe.Pointer(&largeSlice[0]))
+ 	fmt.Printf("subSliceのポインタ: %p\n", unsafe.Pointer(&subSlice[0]))
+ 
+ 	// largeSliceを解放してGCが解放されるかチェック
+ 	largeSlice = nil
+ 
+ 	// メモリを強制的に解放
+ 	runtime.GC()
+ 
+ 	// GC実行後のメモリ統計を取得
+ 	runtime.ReadMemStats(&memStats)
+ 	fmt.Printf("GC後: Alloc = %v MiB\n", bToMb(memStats.Alloc))
+ 	fmt.Printf("GC後: TotalAlloc = %v MiB\n", bToMb(memStats.TotalAlloc))
+ 	fmt.Printf("GC後: Sys = %v MiB\n", bToMb(memStats.Sys))
+ 	fmt.Printf("GC後: NumGC = %v\n\n", memStats.NumGC)
+ 
+ 	// subSliceを保持し続ける
+ 	fmt.Printf("subSliceを参照中: %v\n", subSlice)
+ 
+ 	// もう一度GCを強制実行して確認
+ 	runtime.GC()
+ 	runtime.ReadMemStats(&memStats)
+ 	fmt.Printf("再度GC後: Alloc = %v MiB\n", bToMb(memStats.Alloc))
+ 	fmt.Printf("再度GC後: TotalAlloc = %v MiB\n", bToMb(memStats.TotalAlloc))
+ 	fmt.Printf("再度GC後: Sys = %v MiB\n", bToMb(memStats.Sys))
+ 	fmt.Printf("再度GC後: NumGC = %v\n\n", memStats.NumGC)
+ }
+ 
+ func bToMb(b uint64) uint64 {
+ 	return b / 1024 / 1024
+ }
 ```
 
-```
+```diff txt:実行結果
 GC前: Alloc = 0 MiB
 GC前: TotalAlloc = 0 MiB
 GC前: Sys = 6 MiB
@@ -415,7 +415,8 @@ GC前: NumGC = 0
 
 largeSliceのポインタ: 0xc000180000
 subSliceのポインタ: 0xc000012080
-GC後: Alloc = 0 MiB
+- GC後: Alloc = 763 MiB
++ GC後: Alloc = 0 MiB
 GC後: TotalAlloc = 763 MiB
 GC後: Sys = 771 MiB
 GC後: NumGC = 2
@@ -427,7 +428,9 @@ subSliceを参照中: [0]
 再度GC後: NumGC = 3
 ```
 
-### 番外編 copy よりも Clone の方が便利
+### 番外編：スライスのコピーには copy よりも Clone を使おう
+Go 1.21から導入された`slices.Clone()`は、スライスをコピーする際には`copy()`関数よりもシンプルで便利です。違いを具体的に見てみましょう。
+
 ```go
 package main
 
@@ -447,7 +450,34 @@ func main() {
 }
 ```
 
-```
+```txt:実行結果
 copy: []
 clone: [0 1 2]
 ```
+
+#### copy関数の問題点
+
+`copy()`関数は、スライスの要素を他のスライスにコピーするために使われますが、正しく動作させるにはコピー先スライスのメモリを事前に確保しておく必要があります。上記のコードでは、cpというスライスが初期化されていないため、`copy()`は何もコピーしません。
+
+```go
+var cp = make([]int, len(src))
+copy(cp, src)
+```
+
+このように書けば、`copy()`も正しく動作しますが、コードがやや煩雑になり、余計な手間が増えます。
+
+#### Clone関数の便利さ
+
+```go
+cl := slices.Clone(src)
+```
+
+一方、`slices.Clone()`はスライスをそのままクローンするため、コピー先のメモリ確保を心配する必要がありません。`Clone()`関数は、内部的に適切なサイズの新しいスライスを自動的に作成し、元のスライスのすべての要素を新しいスライスにコピーします。
+
+Clone関数のメリットをまとめます。
+
+- コードがシンプル
+  - メモリを手動で確保する必要がないため、コードが短く読みやすくなります。
+- エラーの可能性が減る
+  - `copy()`で起こりがちな「コピー先スライスが初期化されていない」という問題を回避できます。
+
