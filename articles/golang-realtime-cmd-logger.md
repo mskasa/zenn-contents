@@ -21,20 +21,14 @@ Go Playgroundでは、シェルコマンドの実行や外部コマンドの呼�
 ```go
 func main() {
 	ctx := context.Background()
+	cmd := exec.CommandContext(ctx, "bash", []string{"-c", "for i in {1..5}; do echo \"output $i\"; sleep 3; done"}...)
+	cmd.Dir = "."
 
-	out, err := ShellExecWithArgsHoge(ctx, "bash", []string{"-c", "for i in {1..5}; do echo \"output $i\"; sleep 3; done"}, ".")
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Errorf("Error: %v", err)
+		slog.Error(fmt.Sprintf("Error: %v", err))
 	}
-	log.Info(string(out))
-}
-
-func ShellExecWithArgsHoge(ctx context.Context, cmdName string, args []string, dir string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, cmdName, args...)
-	cmd.Dir = dir
-
-	log.Infof("cmd: %s %v, path: %s", cmdName, args, cmd.Dir)
-	return cmd.CombinedOutput()
+	slog.Info(string(out))
 }
 ```
 
@@ -44,28 +38,16 @@ func ShellExecWithArgsHoge(ctx context.Context, cmdName string, args []string, d
 次に、改善後のコードを見ていきます。このコードでは、出力がリアルタイムに表示され、さらに出力が途絶えた場合には自動的にタイムアウトする機能を追加しています。
 
 ```go
-package main
-
-import (
-	"bufio"
-	"context"
-	"fmt"
-	"os/exec"
-	"time"
-
-	"github.com/labstack/gommon/log"
-)
-
 func ShellExecWithArgs(ctx context.Context, cmdName string, args []string, dir string, timeout time.Duration) error {
 	cmd := exec.CommandContext(ctx, cmdName, args...)
 	cmd.Dir = dir
 
-	log.Infof("cmd: %s %v, path: %s", cmdName, args, cmd.Dir)
+	slog.Info(fmt.Sprintf("cmd: %s %v, path: %s", cmdName, args, cmd.Dir))
 
-	return Exec(ctx, cmd, timeout)
+	return executeCommand(ctx, cmd, timeout)
 }
 
-func Exec(ctx context.Context, cmd *exec.Cmd, timeout time.Duration) error {
+func executeCommand(ctx context.Context, cmd *exec.Cmd, timeout time.Duration) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	timer := time.AfterFunc(timeout, cancel)
@@ -84,24 +66,24 @@ func Exec(ctx context.Context, cmd *exec.Cmd, timeout time.Duration) error {
 	}
 
 	stdoutScanner := bufio.NewScanner(stdout)
-	stdoutOutputChan := make(chan string)
-	stdoutDoneChan := make(chan bool)
+	stdoutChan := make(chan string)
+	stdoutDone := make(chan bool)
 	stderrScanner := bufio.NewScanner(stderr)
-	stderrOutputChan := make(chan string)
-	stderrDoneChan := make(chan bool)
+	stderrChan := make(chan string)
+	stderrDone := make(chan bool)
 
-	go StreamReader(ctx, stdoutScanner, stdoutOutputChan, stdoutDoneChan, timer, timeout)
-	go StreamReader(ctx, stderrScanner, stderrOutputChan, stderrDoneChan, timer, timeout)
+	go streamReader(stdoutScanner, stdoutChan, stdoutDone, timer, timeout)
+	go streamReader(stderrScanner, stderrChan, stderrDone, timer, timeout)
 
-	stillGoing := true
-	for stillGoing {
+	isRunning := true
+	for isRunning {
 		select {
-		case <-stdoutDoneChan:
-			stillGoing = false
-		case line := <-stdoutOutputChan:
-			log.Info(line)
-		case line := <-stderrOutputChan:
-			log.Error(line)
+		case <-stdoutDone:
+			isRunning = false
+		case line := <-stdoutChan:
+			slog.Info(line)
+		case line := <-stderrChan:
+			slog.Error(line)
 		case <-ctx.Done():
 			return fmt.Errorf("command cancelled due to timeout or context cancellation")
 		}
@@ -114,9 +96,9 @@ func Exec(ctx context.Context, cmd *exec.Cmd, timeout time.Duration) error {
 	return nil
 }
 
-func StreamReader(ctx context.Context, scanner *bufio.Scanner, outputChan chan string, doneChan chan bool, timer *time.Timer, timeout time.Duration) {
+func streamReader(scanner *bufio.Scanner, outputChan chan string, doneChan chan bool, timer *time.Timer, timeout time.Duration) {
 	buf := make([]byte, 4096)
-	scanner.Buffer(buf, 393216)
+	scanner.Buffer(buf, 65536)
 
 	scanner.Split(splitFunc)
 	defer close(outputChan)
@@ -126,6 +108,41 @@ func StreamReader(ctx context.Context, scanner *bufio.Scanner, outputChan chan s
 		timer.Reset(timeout)
 	}
 	doneChan <- true
+}
+
+func splitFunc(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+
+	for i := 0; i < len(data); i++ {
+		switch data[i] {
+		case '\n':
+			if i > 0 && data[i-1] == '\r' {
+				return i + 1, data[:i-1], nil // CRLF
+			}
+			return i + 1, data[:i], nil // LF
+		case '\r':
+			if i == len(data)-1 || data[i+1] != '\n' {
+				return i + 1, data[:i], nil // CR
+			}
+		}
+	}
+
+	if atEOF {
+		return len(data), data, nil
+	}
+	return 0, nil, nil
+}
+
+func main() {
+	ctx := context.Background()
+	timeout := 5 * time.Second
+
+	err := ShellExecWithArgs(ctx, "bash", []string{"-c", "for i in {1..5}; do echo \"output $i\"; sleep 3; done"}, ".", timeout)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Error: %v", err))
+	}
 }
 ```
 
@@ -149,9 +166,9 @@ func ShellExecWithArgs(ctx context.Context, cmdName string, args []string, dir s
 	cmd := exec.CommandContext(ctx, cmdName, args...)
 	cmd.Dir = dir
 
-	log.Infof("cmd: %s %v, path: %s", cmdName, args, cmd.Dir)
+	slog.Info(fmt.Sprintf("cmd: %s %v, path: %s", cmdName, args, cmd.Dir))
 
-	return Exec(ctx, cmd, timeout)
+	return executeCommand(ctx, cmd, timeout)
 }
 ```
 
@@ -166,7 +183,7 @@ func ShellExecWithArgs(ctx context.Context, cmdName string, args []string, dir s
 この関数では、コマンドの実行とリアルタイムのログ出力、タイムアウト機能の両方を管理します。
 
 ```go
-func Exec(ctx context.Context, cmd *exec.Cmd, timeout time.Duration) error {
+func executeCommand(ctx context.Context, cmd *exec.Cmd, timeout time.Duration) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	timer := time.AfterFunc(timeout, cancel)
@@ -197,13 +214,13 @@ func Exec(ctx context.Context, cmd *exec.Cmd, timeout time.Duration) error {
 #### コマンドの開始
 `cmd.Start` でコマンドを非同期で実行します。これにより、標準出力・エラーの監視を同時に行いながら、コマンドがバックグラウンドで進行するようにしています。
 
-### 3. StreamReader 関数
+### 3. streamReader 関数
 この関数は、標準出力や標準エラー出力を逐次的に読み取ってログに表示し、タイムアウト機能を管理します。
 
 ```go
-func StreamReader(ctx context.Context, scanner *bufio.Scanner, outputChan chan string, doneChan chan bool, timer *time.Timer, timeout time.Duration) {
+func streamReader(scanner *bufio.Scanner, outputChan chan string, doneChan chan bool, timer *time.Timer, timeout time.Duration) {
 	buf := make([]byte, 4096)
-	scanner.Buffer(buf, 393216)
+	scanner.Buffer(buf, 65536)
 
 	scanner.Split(splitFunc)
 	defer close(outputChan)
@@ -219,7 +236,7 @@ func StreamReader(ctx context.Context, scanner *bufio.Scanner, outputChan chan s
 #### リアルタイムの出力読み取り
 
 `bufio.Scanner` を使用してコマンドの出力を行単位で逐次的に読み取ります。
-出力があるたびに `outputChan` チャネルに送信され、それがメインの `Exec` 関数で処理されます。
+出力があるたびに `outputChan` チャネルに送信され、それがメインの `executeCommand` 関数で処理されます。
 
 #### タイムアウトのリセット
 
@@ -230,7 +247,8 @@ func StreamReader(ctx context.Context, scanner *bufio.Scanner, outputChan chan s
 出力の読み取りが終了したら、`doneChan` チャネルに `true` を送信し、ストリームの処理が完了したことをメインループに通知します。
 
 ### 4. splitFunc 関数
-この関数は、カスタムの行区切りとして `\r` と `\n` を使用するための関数です。
+この関数は、カスタムの行区切りとして `\r` と `\n` 、 `\r\n`を使用するための関数です。
+標準の `Scanner` の動作を上書きするカスタムスプリッタです。これにより、改行コードが異なる環境でも正確に行単位で処理できます。
 
 ```go
 func splitFunc(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -239,11 +257,16 @@ func splitFunc(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	}
 
 	for i := 0; i < len(data); i++ {
-		switch string(data[i]) {
-		case "\r":
-			return i + 1, data[0:i], nil
-		case "\n":
-			return i + 1, data[0:i], nil
+		switch data[i] {
+		case '\n':
+			if i > 0 && data[i-1] == '\r' {
+				return i + 1, data[:i-1], nil // CRLF
+			}
+			return i + 1, data[:i], nil // LF
+		case '\r':
+			if i == len(data)-1 || data[i+1] != '\n' {
+				return i + 1, data[:i], nil // CR
+			}
 		}
 	}
 
@@ -253,22 +276,20 @@ func splitFunc(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	return 0, nil, nil
 }
 ```
-#### カスタムの改行処理
-この関数は、標準の `Scanner` の動作を上書きし、`\r` と `\n` で分割するカスタムスプリッタです。これにより、改行コードが異なる環境でも正確に行単位で処理できます。
 
 ### 5. コマンドの監視とログ出力
 メインの `for select` ループで、標準出力やエラーをリアルタイムにログに出力しています。
 
 ```go
-	stillGoing := true
-	for stillGoing {
+	isRunning := true
+	for isRunning {
 		select {
-		case <-stdoutDoneChan:
-			stillGoing = false
-		case line := <-stdoutOutputChan:
-			log.Info(line)
-		case line := <-stderrOutputChan:
-			log.Error(line)
+		case <-stdoutDone:
+			isRunning = false
+		case line := <-stdoutChan:
+			slog.Info(line)
+		case line := <-stderrChan:
+			slog.Error(line)
 		case <-ctx.Done():
 			return fmt.Errorf("command cancelled due to timeout or context cancellation")
 		}
@@ -276,7 +297,7 @@ func splitFunc(data []byte, atEOF bool) (advance int, token []byte, err error) {
 ```
 #### 標準出力とエラー出力のリアルタイム表示
 
-`stdoutOutputChan` や `stderrOutputChan` からのデータがログに表示され、ユーザーにリアルタイムでフィードバックが行われます。
+`stdoutChan` や `stderrChan` からのデータがログに表示され、ユーザーにリアルタイムでフィードバックが行われます。
 キャンセル処理:
 
 `ctx.Done()` が発動すると、コマンドがキャンセルされた旨のエラーメッセージが出力され、処理が終了します。
@@ -291,14 +312,6 @@ for i in {1..5}; do echo "output $i"; sleep 3; done
 ```
 このコマンドは、5回出力を行い、それぞれ3秒間隔で実行されます。ログが逐次的に出力されるかを確認します。
 
-#### 出力が途絶える場合のタイムアウト確認
-出力が途絶えた場合の挙動を確認するため、タイムアウト設定を 5秒 にした状態で以下のバッシュコマンドを実行します。
-
-```bash
-echo "start"; sleep 10; echo "end"
-```
-このコマンドは、最初に出力を行い、10秒間何も出力せずに最後に再度出力を行います。タイムアウトが5秒に設定されているため、途中でキャンセルが発生することを期待します。
-
 #### 標準エラー出力の確認
 標準エラーが正しく取得されているか確認するために、エラーを出力する以下のバッシュスクリプトを実行します。
 
@@ -306,6 +319,14 @@ echo "start"; sleep 10; echo "end"
 for i in {1..3}; do echo "error $i" 1>&2; sleep 2; done
 ```
 標準エラーが逐次的にリアルタイムでログに出力されることを確認します。
+
+#### 出力が途絶える場合のタイムアウト確認
+出力が途絶えた場合の挙動を確認するため、タイムアウト設定を 5秒 にした状態で以下のバッシュコマンドを実行します。
+
+```bash
+echo "start"; sleep 10; echo "end"
+```
+このコマンドは、最初に出力を行い、10秒間何も出力せずに最後に再度出力を行います。タイムアウトが5秒に設定されているため、途中でキャンセルが発生することを期待します。
 
 ### 結果
 シンプルなシェルコマンド実行の結果
