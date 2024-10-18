@@ -18,12 +18,15 @@ Go Playgroundでは、シェルコマンドの実行や外部コマンドの呼�
 ## 改善前のコード：一度にログが出力される問題
 まずは改善前のコードを見てみましょう。
 
-```go
+```go:改善前のコード
 func main() {
 	ctx := context.Background()
-	cmd := exec.CommandContext(ctx, "bash", []string{"-c", "for i in {1..5}; do echo \"output $i\"; sleep 3; done"}...)
+	cmdName := "bash"
+	args := []string{"-c", "for i in {1..5}; do echo \"output $i\"; sleep 3; done"}
+	cmd := exec.CommandContext(ctx, cmdName, args...)
 	cmd.Dir = "."
 
+	slog.Info(fmt.Sprintf("cmd: %s %v, path: %s", cmdName, args, cmd.Dir))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		slog.Error(fmt.Sprintf("Error: %v", err))
@@ -33,6 +36,17 @@ func main() {
 ```
 
 このコードでは、`exec.CommandContext` を利用してシェルコマンドを実行し、`CombinedOutput()` によって標準出力と標準エラー出力を取得しています。しかし、問題点として、コマンド実行が完了するまでログは一度に蓄積され、最後にまとめて出力されるため、リアルタイム性が損なわれます。例えば、コマンドの実行が遅い場合やエラーが発生した際、ログ出力が遅延し、ユーザーは処理状況を把握できません。
+
+このコードを実行すると、以下のように15秒の実行後、蓄積されたログが一度に出力されます。
+
+```text:実行結果の例
+2024/10/18 11:09:32 INFO cmd: bash [-c for i in {1..5}; do echo "output $i"; sleep 3; done], path: .
+2024/10/18 11:09:47 INFO output 1
+output 2
+output 3
+output 4
+output 5
+```
 
 ## 改善後のコード：リアルタイムなログ出力とタイムアウト機能の追加
 次に、改善後のコードを見ていきます。このコードでは、出力がリアルタイムに表示され、さらに出力が途絶えた場合には自動的にタイムアウトする機能を追加しています。
@@ -154,6 +168,15 @@ func main() {
 
 ### 結果
 このアプローチにより、改善前のコードで発生していた「ログが一度にまとめて出力される」という問題が解消され、さらにタイムアウト機能を追加することで、プロセスの安定性とレスポンス性が大幅に向上しました。
+
+```text:実行結果の例
+2024/10/18 11:14:56 INFO cmd: bash [-c for i in {1..5}; do echo "output $i"; sleep 3; done], path: .
+2024/10/18 11:14:56 INFO output 1
+2024/10/18 11:14:59 INFO output 2
+2024/10/18 11:15:02 INFO output 3
+2024/10/18 11:15:05 INFO output 4
+2024/10/18 11:15:08 INFO output 5
+```
 
 ## 改善後のコード詳細解説
 ここでは、改善後のコードに関する詳細な解説を行います。リアルタイムなログ出力機能と、出力が途絶えた場合のタイムアウト処理の仕組みについて、具体的なコードの動作を説明します。
@@ -329,33 +352,35 @@ echo "start"; sleep 10; echo "end"
 このコマンドは、最初に出力を行い、10秒間何も出力せずに最後に再度出力を行います。タイムアウトが5秒に設定されているため、途中でキャンセルが発生することを期待します。
 
 ### 結果
-シンプルなシェルコマンド実行の結果
+#### シンプルなシェルコマンド実行の結果
 コマンドが実行され、output 1 から output 5 までの出力が3秒間隔でリアルタイムにログに表示されました。
-ログの一例:
 
+```text:実行結果の例
+2024/10/18 11:14:56 INFO cmd: bash [-c for i in {1..5}; do echo "output $i"; sleep 3; done], path: .
+2024/10/18 11:14:56 INFO output 1
+2024/10/18 11:14:59 INFO output 2
+2024/10/18 11:15:02 INFO output 3
+2024/10/18 11:15:05 INFO output 4
+2024/10/18 11:15:08 INFO output 5
 ```
-INFO[0000] output 1
-INFO[0003] output 2
-INFO[0006] output 3
-INFO[0009] output 4
-INFO[0012] output 5
-```
-タイムアウト検証の結果
-5秒 のタイムアウト設定を行った場合、start の出力が表示された後、10秒間出力が途絶えたため、タイムアウトによりコマンドがキャンセルされました。ログにはキャンセルされた旨のエラーメッセージが出力されました。
-ログの一例:
 
-```
-INFO[0000] start
-ERROR[0005] command cancelled due to timeout or context cancellation
-```
-標準エラー出力の結果
+#### 標準エラー出力の結果
 標準エラー出力として error 1 から error 3 までが2秒間隔でリアルタイムにログに表示されました。
-ログの一例:
 
+```text:実行結果の例
+2024/10/18 17:37:09 INFO cmd: bash [-c for i in {1..3}; do echo "error $i" 1>&2; sleep 2; done], path: .
+2024/10/18 17:37:09 ERROR error 1
+2024/10/18 17:37:11 ERROR error 2
+2024/10/18 17:37:13 ERROR error 3
 ```
-ERROR[0000] error 1
-ERROR[0002] error 2
-ERROR[0004] error 3
+
+#### タイムアウト検証の結果
+5秒 のタイムアウト設定を行った場合、start の出力が表示された後、10秒間出力が途絶えたため、タイムアウトによりコマンドがキャンセルされました。ログにはキャンセルされた旨のエラーメッセージが出力されました。
+
+```text:実行結果の例
+2024/10/18 17:38:30 INFO cmd: bash [-c echo "start"; sleep 10; echo "end"], path: .
+2024/10/18 17:38:30 INFO start
+2024/10/18 17:38:35 ERROR Error: command cancelled due to timeout or context cancellation
 ```
 
 ### 検証の総括
