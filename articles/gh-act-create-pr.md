@@ -39,10 +39,11 @@ jobs:
         run: |
           PR_COUNT=$(gh pr list --head "${{ github.ref_name }}" --json number --jq '. | length')
           if [[ $PR_COUNT == 0 ]]; then
+            PR_TITLE=$(echo "${{ github.event.head_commit.message }}" | head -n 1)
             gh pr create \
               -B main \
-              -t "${{ github.event.head_commit.message }}" \
-              -a "${{ github.actor }}"  \
+              -t "$PR_TITLE" \
+              -a "${{ github.actor }}" \
               -F ./.github/workflows/PR_template.md
           else
             echo "PR already exists."
@@ -84,8 +85,8 @@ gh pr list --head "${{ github.ref_name }}" --json number --jq '. | length'
 ```sh
 gh pr create \
   -B main \
-  -t "${{ github.event.head_commit.message }}" \
-  -a "${{ github.actor }}"  \
+  -t "$PR_TITLE" \
+  -a "${{ github.actor }}" \
   -F ./.github/workflows/PR_template.md
 ```
 - コマンド [gh pr create](https://cli.github.com/manual/gh_pr_create) を使用
